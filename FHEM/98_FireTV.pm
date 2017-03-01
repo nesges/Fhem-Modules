@@ -98,7 +98,7 @@ sub FireTV_Define($$) {
     $hash->{ADB}        = $param[3] || '/usr/bin/adb';
     $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.2';
+    $hash->{VERSION}    = '0.3';
     
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
@@ -1059,13 +1059,25 @@ sub FireTV_Remote($;$$$) {
     my $btncmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name button ";
     
     # include html from a user-defined callback "FireTV_Remote_$name_AddButtons"
-    no strict 'refs';
     my $callbackhtml = "";
     my $callback = "FireTV_Remote_".$name."_AddButtons";
-    if(defined &{$callback}) {
-        $callbackhtml = &{$callback};
-    }
-    use strict 'refs';
+    # this doesn't work as planned: 
+    # where should the user implement his callback function? 99_myUtils.pm is too late
+    # if someone stumbles upon this and has an idea how to implement a user-callback,
+    # please let me know
+    #
+    # doc:
+    # <br>
+    # You may define a callback function named <i>FireTV_Remote_&lt;DEVICE&gt;_AddButtons</i> 
+    # that returns additional html. It will be called and inserted after the standard buttons. 
+    # See the source of contrib/99_Utils_FireTV.pm for an example implementation.
+    #
+    # perl:
+    # no strict 'refs';
+    # if(defined &{$callback}) {
+    #     $callbackhtml = &{$callback};
+    # }
+    # use strict 'refs';
     
     my $icon='';
     my $style='';
@@ -1115,32 +1127,37 @@ sub FireTV_Remote($;$$$) {
     return $html;
 }
 
-# example for a callback function
-sub FireTV_Remote_FIRETV_AddButtons() {
-    my $name = 'FIRETV';
-    my $cmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name ";
-    return "<tr><td colspan='3'><hr></td></tr>
-            <tr>
-                <td><a onClick=\"$cmd appstart org.xbmc.kodi')\">".FW_makeImage("kodi", "Kodi", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd appstart com.spotify.tv.android')\">".FW_makeImage("spotify", "Spotify", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd appstart tv.twitch.android.viewer')\">".FW_makeImage("twitch", "twitch", "rc-button")."</a></td>
-            </tr>
-            <tr>
-                <td><a onClick=\"$cmd screen sleep')\">".FW_makeImage("rc_TV\@red", "sleep", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd screen wakeup')\">".FW_makeImage("rc_TV", "wakeup", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd window settings')\">".FW_makeImage("rc_SETUP", "settings", "rc-button")."</a></td>
-            </tr>
-            <tr>
-                <td><a onClick=\"$cmd upload /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload", "upload", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd uploadandview /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload\@red", "upload", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd deletefile --all')\">".FW_makeImage("trash", "delete all", "rc-button")."</a></td>
-            </tr>
-            <tr>
-                <td><a onClick=\"$cmd screenshot')\">".FW_makeImage("image", "screenshot", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd search terminator')\">".FW_makeImage("robot2", "hasta la vista", "rc-button")."</a></td>
-                <td><a onClick=\"$cmd window music')\">".FW_makeImage("music", "music", "rc-button")."</a></td>
-            </tr>";
-}
+# this doesn't work as planned, see above
+#
+# example for a callback function for FireTV_Remote
+# replace FIRETV (sub name and $name) with your devices name
+# sub FireTV_Remote_FIRETV_AddButtons() {
+#     my $name = 'FIRETV';
+#     my $cmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name ";
+# 
+#     return "<tr><td colspan='3'><hr></td></tr>
+#             <tr>
+#                 <td><a onClick=\"$cmd appstart org.xbmc.kodi')\">".FW_makeImage("kodi", "Kodi", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd appstart com.spotify.tv.android')\">".FW_makeImage("spotify", "Spotify", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd appstart tv.twitch.android.viewer')\">".FW_makeImage("twitch", "twitch", "rc-button")."</a></td>
+#             </tr>
+#             <tr>
+#                 <td><a onClick=\"$cmd screen sleep')\">".FW_makeImage("rc_TV\@red", "sleep", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd screen wakeup')\">".FW_makeImage("rc_TV", "wakeup", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd window settings')\">".FW_makeImage("rc_SETUP", "settings", "rc-button")."</a></td>
+#             </tr>
+#             <tr>
+#                 <td><a onClick=\"$cmd upload /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload", "upload", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd uploadandview /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload\@red", "upload", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd deletefile --all')\">".FW_makeImage("trash", "delete all", "rc-button")."</a></td>
+#             </tr>
+#             <tr>
+#                 <td><a onClick=\"$cmd screenshot')\">".FW_makeImage("image", "screenshot", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd window music')\">".FW_makeImage("music", "music", "rc-button")."</a></td>
+#                 <td><a onClick=\"$cmd search terminator')\">".FW_makeImage("robot2", "hasta la vista", "rc-button")."</a></td>
+#             </tr>";
+# }
+
 
 1;
 
@@ -1323,10 +1340,6 @@ sub FireTV_Remote_FIRETV_AddButtons() {
         <li>COLLAPSIBLE: If set to a positive value (1), the remote is displayed collapsed and will expand after clicking it's icon. Default: not set</li>
         <li>DEVICELINK: If not set, the Remote has a clickable title which links to the controlled device. If set to "0" it has no title. If set to any other value, that value will be used as clickable title. Default: not set</li>
     </ul>
-    <br>
-    You may define a callback function named <i>FireTV_Remote_&lt;DEVICE&gt;_AddButtons</i> 
-    that returns additional html. It will be called and inserted after the standard buttons. 
-    See the source of 98_FireTV.pm for an example implementation.
 </ul>
 =end html
 
