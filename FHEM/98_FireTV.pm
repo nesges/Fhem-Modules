@@ -1159,7 +1159,7 @@ sub FireTV_Remote_FIRETV_AddButtons() {
         <li>Activate adb debugging in your fire tv (<a href="http://www.aftvnews.com/how-to-enable-adb-debugging-on-an-amazon-fire-tv-or-fire-tv-stick/">see here</a>)</li>
         <li>Get <i>adb</i> for your fhem-server. Depending on your system, you have several options:
             <ul>
-                <li>Win/Mac/Linux: <a href="https://developer.android.com/studio/index.html">Android SDK</a> (huge!)</li>
+                <li>Win/Mac/Linux: <a href="https://developer.android.com/studio/releases/platform-tools.html">Android SDK Platform-Tools</a></li>
                 <li>Raspbian: <a href="https://github.com/DeepSilence/adb-arm">adb-arm</a></li>
             </ul>
         </li>
