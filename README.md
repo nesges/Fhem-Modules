@@ -6,3 +6,5 @@
 * `cd <FHEMDIR>`
 * `perl contrib/commandref_join.pl`
 * review your local commandref (http://&lt;FHEMURL&gt;/fhem/docs/commandref.html)
+
+or have a look at the Wiki: https://github.com/nesges/Fhem-Modules/wiki

@@ -52,7 +52,7 @@ sub FireTV_Initialize($) {
                                 ." absenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20"
                                 ." presenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20"
                                 ." absenceTimeout presenceTimeout "
-                                ." do_not_notify:0,1 disable:0,1 disabledForIntervals ";
+                                ." do_not_notify:0,1 disable:0,1 disabledForIntervals "; # disabledForIntervals seems to be broken - TODO
     }
 }
 
@@ -1304,6 +1304,20 @@ sub FireTV_Remote($;$$$) {
                 Files uploaded via <i>set upload</i> are deleted after SECONDS when set to a positve integer number. Default: not set</li>
             <li><i>upviewdeleteafter</i> &lt;SECONDS&gt;<br>
                 Files uploaded via <i>set uploadandview</i> are deleted after SECONDS when set to a positve integer number. Default: not set</li>
+        </ul>
+        <b>Inherited from <a href='#PRESENCE_attr'>PRESENCE</a>:</b>
+        <ul>
+            <li><i>absenceThreshold</i></li>
+            <li><i>absenceTimeout</i></li>
+            <li><i>disable</i></li>
+            <li><i>ping_count</i></li>
+            <li><i>presenceThreshold</i></li>
+            <li><i>presenceTimeout</i></li>
+        </ul>
+        <b>Other:</b>
+        <ul>
+            <li><a href='#do_not_notify'>do_not_notify</a></li>
+            <li><a href='#readingFnAttributes'>readingFnAttributes</a></li>
         </ul>
     </ul>
     <br>
