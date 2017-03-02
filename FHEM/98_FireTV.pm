@@ -99,7 +99,7 @@ sub FireTV_Define($$) {
     $hash->{ADB}        = $param[3] || '/usr/bin/adb';
     $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.3';
+    $hash->{VERSION}    = '0.4';
     
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
@@ -252,12 +252,8 @@ sub FireTV_Set($@) {
 	                }
 	            }
 	            if(!$pid) {
-	                if(FireTV_connect($hash)) {
-	                    if(FireTV_wakeup($hash)) {
-	                        $hash->{helper}{$name}{'blockingcall'}{'screenshot'}{RUNNING_PID} = BlockingCall('FireTV_screenshot', $name, 'FireTV_screenshot_ok', 300, 'FireTV_screenshot_error', $name);
-	                        return undef;
-	                    }
-	                }
+	                $hash->{helper}{$name}{'blockingcall'}{'screenshot'}{RUNNING_PID} = BlockingCall('FireTV_screenshot', $name, 'FireTV_screenshot_ok', 300, 'FireTV_screenshot_error', $name);
+	                return undef;
 	            } else {
 	                return "screenshot already running ($pid)";
 	            }
@@ -369,7 +365,7 @@ sub FireTV_Set($@) {
 	    # PRESENCE
 	    } elsif($opt eq 'statusRequest' && $hash->{helper}{$name}{'PRESENCE_loaded'}) {
             if($hash->{MODE} ne "lan-bluetooth") {
-                Log3 $name, 5, "[$name] FireTV_Attr: starting local scan";
+                Log3 $name, 4, "[$name] FireTV_Attr: starting local scan";
                 return PRESENCE_StartLocalScan($hash, 1);
             } else {
                 if(exists($hash->{FD})) {
@@ -525,15 +521,27 @@ sub FireTV_adb($$) {
     }
     
     if($hash->{adbconnected} || $cmd =~ /^connect/ ) {
-        # execute command
         $hash->{helper}{$name}{lastadbcmd} = $hash->{ADB}." $cmd";
+        Log3 $name, 4, "[$name] FireTV_adb command: ".$hash->{helper}{$name}{lastadbcmd};
+
+        # execute command
         $hash->{helper}{$name}{lastadbresponse} = `$hash->{helper}{$name}{lastadbcmd} 2>&1` || '';
+        
+        # check if adb server needs a restart
+        if($hash->{helper}{$name}{lastadbresponse} =~ /cannot bind 'tcp:5037'/) {
+            Log3 $name, 4, "[$name] FireTV_adb response: ".$hash->{helper}{$name}{lastadbresponse};
+            Log3 $name, 4, "[$name] FireTV_adb: restarting adb server and repeating last command";
+            system($hash->{ADB}." kill-server");
+            system($hash->{ADB}." start-server");
+            system($hash->{ADB}." connect ".$hash->{IP});
+            $hash->{helper}{$name}{lastadbresponse} = `$hash->{helper}{$name}{lastadbcmd} 2>&1` || '';
+        }
+        
         $hash->{helper}{$name}{lastadbresponse} =~ s/^\s*//sg;
         $hash->{helper}{$name}{lastadbresponse} =~ s/\s*$//sg;
-        Log3 $name, 5, "[$name] FireTV_adb command: ".$hash->{helper}{$name}{lastadbcmd};
-        Log3 $name, 5, "[$name] FireTV_adb response: ".$hash->{helper}{$name}{lastadbresponse} if $hash->{helper}{$name}{lastadbresponse};
 
-        return 1; # $hash->{helper}{$name}{lastadbresponse};
+        Log3 $name, 4, "[$name] FireTV_adb response: ".$hash->{helper}{$name}{lastadbresponse} if $hash->{helper}{$name}{lastadbresponse};
+        return 1;
     } else {
         Log3 $name, 4, "[$name] FireTV_adb not connected: ".$hash->{helper}{$name}{lastadbresponse};
     }
@@ -554,7 +562,8 @@ sub FireTV_connect($;$) {
     # if marked as connected, disconnect first
     if($action eq 'connect' && $hash->{adbconnected}) {
         if(!defined($attr{$name}{holdconnection}) || $attr{$name}{holdconnection} ne 'yes') {
-            FireTV_adb($hash, "disconnect $ip");
+            system($hash->{ADB}." disconnect ".$hash->{IP});
+            # FireTV_adb($hash, "disconnect $ip");
         } else {
             Log3 $name, 4, "[$name] FireTV_connect: no disconnect because of holdconnection yes";
         }
@@ -815,30 +824,34 @@ sub FireTV_screenshot($) {
     }
     my $name = $hash->{NAME};
     
-    my $remote_tempfile = FireTV_tempfile($hash, '/sdcard/screenshot');
-    if(FireTV_adb($hash, "shell screencap -p $remote_tempfile")) {
-        my $localfile;
-        if(!defined($attr{$name}{screenshotpath})) {
-            $localfile = tmpnam();
-        } elsif(-d $attr{$name}{screenshotpath}) {
-            $localfile = FireTV_localtempfile($hash, $attr{$name}{screenshotpath}, '.png')
-        } else {
-            $localfile = $attr{$name}{screenshotpath};
-        }
-        
-        if($localfile) {
-            FireTV_adb($hash, "pull $remote_tempfile $localfile");
-            if(! -e $localfile) {
-                Log3 $name, 3, "[$name] FireTV_screenshot: couldn't pull to localfile $localfile (".$hash->{helper}{$name}{lastadbresponse}.")";
+    if(FireTV_connect($hash)) {
+	    if(FireTV_wakeup($hash)) {
+            my $remote_tempfile = FireTV_tempfile($hash, '/sdcard/screenshot');
+            if(FireTV_adb($hash, "shell screencap -p $remote_tempfile")) {
+                my $localfile;
+                if(!defined($attr{$name}{screenshotpath})) {
+                    $localfile = tmpnam();
+                } elsif(-d $attr{$name}{screenshotpath}) {
+                    $localfile = FireTV_localtempfile($hash, $attr{$name}{screenshotpath}, '.png')
+                } else {
+                    $localfile = $attr{$name}{screenshotpath};
+                }
+                
+                if($localfile) {
+                    FireTV_adb($hash, "pull $remote_tempfile $localfile");
+                    if(! -e $localfile) {
+                        Log3 $name, 3, "[$name] FireTV_screenshot: couldn't pull to localfile $localfile (".$hash->{helper}{$name}{lastadbresponse}.")";
+                    }
+                } else {
+                    Log3 $name, 3, "[$name] FireTV_screenshot: couldn't create localfile (".$hash->{helper}{$name}{lastadbresponse}.")";
+                }
+                if(! FireTV_adb($hash, "shell rm $remote_tempfile")) {
+                    Log3 $name, 3, "[$name] FireTV_screenshot: couldn't delete remote tempfile $remote_tempfile";
+                }
+                
+                return "$name|$localfile";
             }
-        } else {
-            Log3 $name, 3, "[$name] FireTV_screenshot: couldn't create localfile (".$hash->{helper}{$name}{lastadbresponse}.")";
         }
-        if(! FireTV_adb($hash, "shell rm $remote_tempfile")) {
-            Log3 $name, 3, "[$name] FireTV_screenshot: couldn't delete remote tempfile $remote_tempfile";
-        }
-        
-        return "$name|$localfile";
     }
     return undef;
 }
@@ -943,7 +956,15 @@ sub FireTV_screenshot_ok($) {
         readingsSingleUpdate($hash, "screenshot", $localfile, 1);
     } else {
         readingsSingleUpdate($hash, "screenshot", '', 1);
-        Log3 $name, 3, "[$name] FireTV_screenshot_ok: something went wrong when saving $localfile for $name";
+        my $details = '';
+        if(!-e $localfile) {
+            $details =  'file does not exist';
+        } elsif(!-r $localfile) {
+            $details =  'file ist not readable';
+        } elsif(!-s $localfile) {
+            $details =  'file ist zero sized';
+        }
+        Log3 $name, 3, "[$name] FireTV_screenshot_ok: something went wrong when saving $localfile for $name ($details)";
     }
     
     delete($hash->{helper}{$name}{'blockingcall'}{'screenshot'}{RUNNING_PID});
