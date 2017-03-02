@@ -5,6 +5,7 @@
 # Please copy this file from contrib/ to FHEM/ and edit where necessary
 #
 # 2017 by Thomas Nesges <thomas@nesges.eu>
+# $Id$
 ########################################################################
 
 package main;
