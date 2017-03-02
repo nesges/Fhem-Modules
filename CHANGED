@@ -1,0 +1,5 @@
+2017-03-01
+ added 99_Utils_FireTV
+ removed callback function for FireTV_Remote
+ added doc2mw.sh
+ added control-file for the fhem update mechanism

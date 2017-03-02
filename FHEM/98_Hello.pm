@@ -1,3 +1,16 @@
+########################################################################
+# 98_Hello.pm
+# 
+# Hello implements the classical "Hello World" as a starting point for 
+# module development. You may want to copy 98_Hello.pm to start 
+# implementing a module of your very own. 
+# See http://www.fhemwiki.de/wiki/DevelopmentModuleIntro for an 
+# in-depth instruction to your first module.
+#
+# 2015 by Thomas Nesges <thomas@nesges.eu>
+# $Id$
+########################################################################
+
 package main;
 use strict;
 use warnings;
