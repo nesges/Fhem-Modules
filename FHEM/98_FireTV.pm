@@ -679,9 +679,9 @@ sub FireTV_search_only($$) {
     
     # may need some fine tuning
     if(FireTV_wakeup($hash)) {
-        usleep(10000);
+        usleep(5000);
         if(FireTV_home($hash)) {
-            usleep(500);
+            usleep(5000);
             if(FireTV_home($hash)) {
                 if(FireTV_up($hash)) {
                     if(FireTV_enter($hash)) {
