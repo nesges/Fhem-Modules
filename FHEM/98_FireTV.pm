@@ -42,7 +42,7 @@ sub FireTV_Initialize($) {
     $hash->{SetFn}      = 'FireTV_Set';
     $hash->{GetFn}      = 'FireTV_Get';
     $hash->{AttrFn}     = 'FireTV_Attr';
-    $hash->{AttrList}   = "holdconnection:yes,no screenshotpath upviewdeleteafter uploaddeleteafter ".$readingFnAttributes;
+    $hash->{AttrList}   = "holdconnection:yes,no screenshotpath upviewdeleteafter uploaddeleteafter remotehtml:textField-long ".$readingFnAttributes;
     
     if(LoadModule("PRESENCE") eq "PRESENCE") {    
         # PRESENCE    
@@ -1080,26 +1080,39 @@ sub FireTV_Remote($;$$$) {
     
     my $btncmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name button ";
     
-    # include html from a user-defined callback "FireTV_Remote_$name_AddButtons"
-    my $callbackhtml = "";
-    my $callback = "FireTV_Remote_".$name."_AddButtons";
-    # this doesn't work as planned: 
-    # where should the user implement his callback function? 99_myUtils.pm is too late
-    # if someone stumbles upon this and has an idea how to implement a user-callback,
-    # please let me know
-    #
-    # doc:
-    # <br>
-    # You may define a callback function named <i>FireTV_Remote_&lt;DEVICE&gt;_AddButtons</i> 
-    # that returns additional html. It will be called and inserted after the standard buttons. 
-    # See the source of contrib/99_Utils_FireTV.pm for an example implementation.
-    #
-    # perl:
-    # no strict 'refs';
-    # if(defined &{$callback}) {
-    #     $callbackhtml = &{$callback};
+    my $remotehtml = AttrVal($name, 'remotehtml', undef);
+    if($remotehtml && $remotehtml =~ m/^\s*{.*}\s*$/) {
+        $remotehtml = eval $remotehtml;
+    }
+    
+    # example for remotehtml
+    # replace FIRETV (sub name and $name) with your devices name
+    # {
+    #     my $name = 'FIRETV';
+    #     my $cmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name ";
+    # 
+    #     return "<tr><td colspan='3'><hr></td></tr>
+    #             <tr>
+    #                 <td><a onClick=\"$cmd appstart org.xbmc.kodi')\">".FW_makeImage("kodi", "Kodi", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd appstart com.spotify.tv.android')\">".FW_makeImage("spotify", "Spotify", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd appstart tv.twitch.android.viewer')\">".FW_makeImage("twitch", "twitch", "rc-button")."</a></td>
+    #             </tr>
+    #             <tr>
+    #                 <td><a onClick=\"$cmd screen sleep')\">".FW_makeImage("rc_TV\@red", "sleep", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd screen wakeup')\">".FW_makeImage("rc_TV", "wakeup", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd window settings')\">".FW_makeImage("rc_SETUP", "settings", "rc-button")."</a></td>
+    #             </tr>
+    #             <tr>
+    #                 <td><a onClick=\"$cmd upload /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload", "upload", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd uploadandview /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload\@red", "upload", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd deletefile --all')\">".FW_makeImage("trash", "delete all", "rc-button")."</a></td>
+    #             </tr>
+    #             <tr>
+    #                 <td><a onClick=\"$cmd screenshot')\">".FW_makeImage("image", "screenshot", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd window music')\">".FW_makeImage("music", "music", "rc-button")."</a></td>
+    #                 <td><a onClick=\"$cmd search terminator')\">".FW_makeImage("robot2", "hasta la vista", "rc-button")."</a></td>
+    #             </tr>";
     # }
-    # use strict 'refs';
     
     my $icon='';
     my $style='';
@@ -1141,45 +1154,13 @@ sub FireTV_Remote($;$$$) {
                     <td><a onClick=\"$btncmd playpause')\">".FW_makeImage("rc_PLAY", "playpause", "rc-button")."</a></td>
                     <td><a onClick=\"$btncmd next')\">".FW_makeImage("rc_FF", "next", "rc-button")."</a></td>
                 </tr>
-                ".$callbackhtml."
+                ".$remotehtml."
             </table>
         </div>
     </div>";
 
     return $html;
 }
-
-# this doesn't work as planned, see above
-#
-# example for a callback function for FireTV_Remote
-# replace FIRETV (sub name and $name) with your devices name
-# sub FireTV_Remote_FIRETV_AddButtons() {
-#     my $name = 'FIRETV';
-#     my $cmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name ";
-# 
-#     return "<tr><td colspan='3'><hr></td></tr>
-#             <tr>
-#                 <td><a onClick=\"$cmd appstart org.xbmc.kodi')\">".FW_makeImage("kodi", "Kodi", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd appstart com.spotify.tv.android')\">".FW_makeImage("spotify", "Spotify", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd appstart tv.twitch.android.viewer')\">".FW_makeImage("twitch", "twitch", "rc-button")."</a></td>
-#             </tr>
-#             <tr>
-#                 <td><a onClick=\"$cmd screen sleep')\">".FW_makeImage("rc_TV\@red", "sleep", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd screen wakeup')\">".FW_makeImage("rc_TV", "wakeup", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd window settings')\">".FW_makeImage("rc_SETUP", "settings", "rc-button")."</a></td>
-#             </tr>
-#             <tr>
-#                 <td><a onClick=\"$cmd upload /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload", "upload", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd uploadandview /mnt/sky/data/lich_necromancer.png')\">".FW_makeImage("upload\@red", "upload", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd deletefile --all')\">".FW_makeImage("trash", "delete all", "rc-button")."</a></td>
-#             </tr>
-#             <tr>
-#                 <td><a onClick=\"$cmd screenshot')\">".FW_makeImage("image", "screenshot", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd window music')\">".FW_makeImage("music", "music", "rc-button")."</a></td>
-#                 <td><a onClick=\"$cmd search terminator')\">".FW_makeImage("robot2", "hasta la vista", "rc-button")."</a></td>
-#             </tr>";
-# }
-
 
 1;
 
@@ -1318,6 +1299,8 @@ sub FireTV_Remote($;$$$) {
         <ul>
             <li><i>holdconnection</i> yes|no<br>
                 "yes" to keep the adb connection open or "no" to close it after every command. Default: no</li>
+            <li><i>remotehtml</i> &lt;HTML&gt;<br>
+                HTML to add to the output of FireTV_Remote() (<a href="#FireTV_FireTV_Remote">see below</a>)</li>
             <li><i>screenshotpath</i> &lt;PATH&gt;<br>
                 If <i>screenshotpath</i> is set to a filename, every new screenshot (see <i>set screenshot</i>) will overwrite that file. 
                 If set to a directory, a random file will be created in that directory. 
@@ -1362,19 +1345,45 @@ sub FireTV_Remote($;$$$) {
     </ul>
 
     <br><br>
-    The module provides an additional function <i>FireTV_Remote()</i> which returns
-    html code for a graphic remote control usable in FHEMWEB. Just define a weblink 
-    device like:
-    <br><br>
-    <code>define FIRETV_REMOTE weblink htmlCode { FireTV_Remote('FIRETV') }</code><br>
-    <code>define FIRETV_REMOTE weblink htmlCode { FireTV_Remote(DEVICE, ICON, COLLAPSIBLE, DEVICELINK) }</code>
-    <br><br>
-    <b>Parameters:</b>
+    <a name="FireTV_FireTV_Remote"></a>
+    <b>FireTV_Remote()</b>
     <ul>
-        <li>DEVICE: Devicename of your FireTV-Device</li>
-        <li>ICON: Icon to display in the upper left corner. Default: it_remote</li>
-        <li>COLLAPSIBLE: If set to a positive value (1), the remote is displayed collapsed and will expand after clicking it's icon. Default: not set</li>
-        <li>DEVICELINK: If not set, the Remote has a clickable title which links to the controlled device. If set to "0" it has no title. If set to any other value, that value will be used as clickable title. Default: not set</li>
+        The module provides an additional function <i>FireTV_Remote()</i> which returns
+        html code for a graphic remote control usable in FHEMWEB. Just define a weblink 
+        device like:
+        <br><br>
+        <code>define FIRETV_REMOTE weblink htmlCode { FireTV_Remote('FIRETV') }</code><br>
+        <code>define FIRETV_REMOTE weblink htmlCode { FireTV_Remote(DEVICE, ICON, COLLAPSIBLE, DEVICELINK) }</code>
+        <br><br>
+        <b>Parameters:</b>
+        <ul>
+            <li>DEVICE: Devicename of your FireTV-Device</li>
+            <li>ICON: Icon to display in the upper left corner. Default: it_remote</li>
+            <li>COLLAPSIBLE: If set to a positive value (1), the remote is displayed collapsed and will expand after clicking it's icon. Default: not set</li>
+            <li>DEVICELINK: If not set, the Remote has a clickable title which links to the controlled device. If set to "0" it has no title. If set to any other value, that value will be used as clickable title. Default: not set</li>
+        </ul>
+        <br>
+        The content of the attribute <i>remotehtml</i> is added at the end of FireTV_Remote() 
+        output. If the content is wrapped in curly brackets it is interpreted as perl-code. 
+        The output is structured in a three-column table-layout. Here is an example of how to
+        add some additional buttons to the remote:
+        <br>
+        <pre>    {
+        my $device = 'FIRETV';
+        my $cmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$device=set $device ";
+    
+        return "&lt;tr&gt;&lt;td colspan='3'&gt;&lt;hr&gt;&lt;/td&gt;&lt;/tr&gt;
+                &lt;tr&gt;
+                    &lt;td&gt;&lt;a onClick=\"$cmd appstart org.xbmc.kodi')\"&gt;".FW_makeImage("kodi", "Kodi", "rc-button")."&lt;/a&gt;&lt;/td&gt;
+                    &lt;td&gt;&lt;a onClick=\"$cmd appstart com.spotify.tv.android')\"&gt;".FW_makeImage("spotify", "Spotify", "rc-button")."&lt;/a&gt;&lt;/td&gt;
+                    &lt;td&gt;&lt;a onClick=\"$cmd appstart tv.twitch.android.viewer')\"&gt;".FW_makeImage("twitch", "twitch", "rc-button")."&lt;/a&gt;&lt;/td&gt;
+                &lt;/tr&gt;
+                &lt;tr&gt;
+                    &lt;td&gt;&lt;a onClick=\"$cmd screen sleep')\"&gt;".FW_makeImage("rc_TV\@red", "sleep", "rc-button")."&lt;/a&gt;&lt;/td&gt;
+                    &lt;td&gt;&lt;a onClick=\"$cmd screen wakeup')\"&gt;".FW_makeImage("rc_TV", "wakeup", "rc-button")."&lt;/a&gt;&lt;/td&gt;
+                    &lt;td&gt;&lt;a onClick=\"$cmd window settings')\"&gt;".FW_makeImage("rc_SETUP", "settings", "rc-button")."&lt;/a&gt;&lt;/td&gt;
+                &lt;/tr&gt;";
+    }</pre>
     </ul>
 </ul>
 =end html

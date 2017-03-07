@@ -52,3 +52,29 @@ sub ftv_active(;$) {
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="Utils_FireTV"></a>
+<h3>Utils_FireTV</h3>
+<ul>
+    <a name="Utils_FireTV_ftv_active"></a>
+    <b>ftv_active([&lt;DEFAULT&gt;])</b><br>
+    <ul>
+        Examines all devices of TYPE FireTV and tries to determine which is active. 
+        The main indicator is it's state (present = active), but it also utilitzes a 
+        <a href="#userattr">userattr</a> <i>priority</i> to decide between more than one present devices.
+        Set <i>priority</i> to a numerical value to indicate higher or lower priority, e.g.:
+        <br><br>
+        <code>attr userattr TYPE=FireTV priority</code><br>
+        <code>attr priority FIRETV1 10</code><br>
+        <code>attr priority FIRETV2 5</code><br>
+        <code>attr priority FIRETV3 0</code><br>
+        <br>
+        Returns the active devices name or DEFAULT if none is active.
+    </ul>
+</ul>
+=end html
+
+=cut
