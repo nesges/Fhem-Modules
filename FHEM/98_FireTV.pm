@@ -15,7 +15,6 @@
 # uses File::MimeInfo by Michiel Beijen
 #
 # 2017 by Thomas Nesges <thomas@nesges.eu>
-# $Id$
 ########################################################################
 
 package main;

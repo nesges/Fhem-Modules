@@ -6,7 +6,6 @@
 # repeated in a given interval. 
 #
 # 2017 by Thomas Nesges <thomas@nesges.eu>
-# $Id$
 ########################################################################
 
 package main;

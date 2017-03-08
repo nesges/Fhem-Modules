@@ -8,7 +8,6 @@
 # in-depth instruction to your first module.
 #
 # 2015 by Thomas Nesges <thomas@nesges.eu>
-# $Id$
 ########################################################################
 
 package main;
