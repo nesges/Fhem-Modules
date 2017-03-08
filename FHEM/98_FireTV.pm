@@ -42,7 +42,7 @@ sub FireTV_Initialize($) {
     $hash->{SetFn}      = 'FireTV_Set';
     $hash->{GetFn}      = 'FireTV_Get';
     $hash->{AttrFn}     = 'FireTV_Attr';
-    $hash->{AttrList}   = "holdconnection:yes,no screenshotpath upviewdeleteafter uploaddeleteafter remotehtml:textField-long ".$readingFnAttributes;
+    $hash->{AttrList}   = "holdconnection:yes,no screenshotpath upviewdeleteafter uploaddeleteafter remotehtml ".$readingFnAttributes;
     
     if(LoadModule("PRESENCE") eq "PRESENCE") {    
         # PRESENCE    
