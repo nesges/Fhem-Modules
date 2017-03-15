@@ -7,6 +7,7 @@
 #   1.) enable adb debugging in your fire tv
 #   2.) get adb and copy the binary to /usr/bin/
 #       some sources for raspbian binaries:
+#           apt-get install android-tools-adb
 #           https://github.com/DeepSilence/adb-arm
 #           https://forum.xda-developers.com/showthread.php?t=1924492
 #           http://forum.xda-developers.com/attachment.php?attachmentid=1392336&d=1349930509
@@ -54,6 +55,11 @@ sub FireTV_Initialize($) {
                                 ." absenceTimeout presenceTimeout "
                                 ." do_not_notify:0,1 disable:0,1 disabledForIntervals "; # disabledForIntervals seems to be broken - TODO
     }
+    
+    # PORT was introduced later, set a default here to avoid users having to redefine their devices
+    if(! defined($hash->{PORT})) {
+        $hash->{PORT} = '5555';
+    }
 }
 
 sub FireTV_Define($$) {
@@ -77,7 +83,7 @@ sub FireTV_Define($$) {
         }
     }
     
-    if(defined($param[2]) && $param[2]!~/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/) {
+    if(defined($param[2]) && $param[2]!~/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d{1,5})?$/) {
         return "IP '".$param[3]."' is no valid ip address";
     }
     if(defined($param[3]) && ! -x $param[3]) {
@@ -95,10 +101,16 @@ sub FireTV_Define($$) {
     
     $hash->{NAME}       = $name;
     $hash->{IP}         = $param[2];
+    if($hash->{IP} =~ m/(.*?):(.*)/) {
+        $hash->{IP} = $1;
+        $hash->{PORT} = $2;
+    } else {
+        $hash->{PORT} = '5555';
+    }
     $hash->{ADB}        = $param[3] || '/usr/bin/adb';
     $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.4';
+    $hash->{VERSION}    = '0.5';
     
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
@@ -376,7 +388,7 @@ sub FireTV_Set($@) {
         }
         
 	} else {
-		my $packages = $hash->{helper}{$name}{'packages'};
+		my $packages = $hash->{helper}{$name}{'packages'} || '';
 	    
 	    my @buttons = sort(qw(up down left right enter back home menu prev playpause next));
 	    my @keys = sort(qw(KEYCODE_DPAD_UP KEYCODE_DPAD_DOWN KEYCODE_DPAD_LEFT KEYCODE_DPAD_CENTER 
@@ -520,7 +532,11 @@ sub FireTV_adb($$) {
     }
     
     if($hash->{adbconnected} || $cmd =~ /^connect/ ) {
-        $hash->{helper}{$name}{lastadbcmd} = $hash->{ADB}." $cmd";
+        my $deviceid = "-s ".$hash->{IP}.":".$hash->{PORT};
+        if($cmd =~ /^connect/) {
+            $deviceid='';
+        }
+        $hash->{helper}{$name}{lastadbcmd} = $hash->{ADB}." $deviceid $cmd";
         Log3 $name, 4, "[$name] FireTV_adb command: ".$hash->{helper}{$name}{lastadbcmd};
 
         # execute command
@@ -532,7 +548,7 @@ sub FireTV_adb($$) {
             Log3 $name, 4, "[$name] FireTV_adb: restarting adb server and repeating last command";
             system($hash->{ADB}." kill-server");
             system($hash->{ADB}." start-server");
-            system($hash->{ADB}." connect ".$hash->{IP});
+            system($hash->{ADB}." connect ".$hash->{IP}.":".$hash->{PORT});
             $hash->{helper}{$name}{lastadbresponse} = `$hash->{helper}{$name}{lastadbcmd} 2>&1` || '';
         }
         
@@ -561,7 +577,7 @@ sub FireTV_connect($;$) {
     # if marked as connected, disconnect first
     if($action eq 'connect' && $hash->{adbconnected}) {
         if(!defined($attr{$name}{holdconnection}) || $attr{$name}{holdconnection} ne 'yes') {
-            system($hash->{ADB}." disconnect ".$hash->{IP});
+            system($hash->{ADB}." disconnect ".$hash->{IP}.":".$hash->{PORT});
             # FireTV_adb($hash, "disconnect $ip");
         } else {
             Log3 $name, 4, "[$name] FireTV_connect: no disconnect because of holdconnection yes";
@@ -725,14 +741,26 @@ sub FireTV_app($$;$) {
     
     if(FireTV_wakeup($hash)) {
         if($action eq 'start') {
+            # try LEANBACK_LAUNCHER intent
+            Log3 $name, 4, "[$name] FireTV_app: trying LEANBACK_LAUNCHER for $app";
+            if(FireTV_adb($hash, "shell monkey -p $app -c android.intent.category.LEANBACK_LAUNCHER 1")) {
+                my $response = $hash->{helper}{$name}{lastadbresponse};
+                if($response !~ /No activities found to run, monkey aborted/i) {
+                    return $app.' started';
+                }
+            }
+            
+            # try LAUNCHER intent
+            Log3 $name, 4, "[$name] FireTV_app: trying LAUNCHER for $app";
             if(FireTV_adb($hash, "shell monkey -p $app -c android.intent.category.LAUNCHER 1")) {
                 my $response = $hash->{helper}{$name}{lastadbresponse};
                 if($response !~ /No activities found to run, monkey aborted/i) {
                     return $app.' started';
-                } else {
-                    return "error: ".$response;
                 }
             }
+
+            Log3 $name, 4, "[$name] FireTV_app: couldn't start $app";
+            return "error: ".$response;
         } elsif($action eq 'stop') {
             if(FireTV_adb($hash, "shell am force-stop $app")) {
                 return $app.' stopped';
@@ -782,11 +810,13 @@ sub FireTV_tempfile($;$$$) {
     my $tempfile = FireTV_rndnam($prefix).$suffix;
     until(FireTV_adb($hash, "shell ls $tempfile") && $hash->{helper}{$name}{lastadbresponse} =~ /no such file or directory/i) {
         $tempfile = FireTV_rndnam($prefix).$suffix;
+        return undef if($hash->{helper}{$name}{lastadbresponse} =~ /device is offline/i);
         return undef if(++$c>$maxtries);
     }
     if(! FireTV_adb($hash, "shell touch $tempfile")) {
         Log3 $name, 3, "[$name] FireTV_tempfile: couldn't touch tempfile ".$tempfile;
     }
+    Log3 $name, 4, "[$name] FireTV_tempfile tempfile: ".$tempfile;
     return $tempfile;
 }
 
@@ -1179,7 +1209,7 @@ sub FireTV_Remote($;$$$) {
         <li>Get <i>adb</i> for your fhem-server. Depending on your system, you have several options:
             <ul>
                 <li>Win/Mac/Linux: <a href="https://developer.android.com/studio/releases/platform-tools.html">Android SDK Platform-Tools</a></li>
-                <li>Raspbian: <a href="https://github.com/DeepSilence/adb-arm">adb-arm</a></li>
+                <li>Raspbian: <tt>apt-get install android-tools-adb</tt> or <a href="https://github.com/DeepSilence/adb-arm">DeepSilence/adb-arm</a></li>
             </ul>
         </li>
         <li>uses the perl module <a href="http://search.cpan.org/search?query=File%3A%3AMimeInfo&mode=module">File::MimeInfo</a> for some tasks. Installs via <i>apt-get install libfile-mimeinfo-perl</i> on some systems</li>
@@ -1189,7 +1219,7 @@ sub FireTV_Remote($;$$$) {
     <a name="FireTVdefine"></a>
     <b>Define</b>
     <ul>
-        <code>define &lt;name&gt; FireTV &lt;IP&gt; [&lt;ADB_PATH&gt;] [&lt;PRESENCE_TIMEOUT_ABSENT&gt;] [&lt;PRESENCE_TIMEOUT_PRESENT&gt;] [&lt;PRESENCE_MODE&gt;] [&lt;PRESENCE_ADDRESS&gt;]</code><br>
+        <code>define &lt;name&gt; FireTV &lt;IP[:PORT]&gt; [&lt;ADB_PATH&gt;] [&lt;PRESENCE_TIMEOUT_ABSENT&gt;] [&lt;PRESENCE_TIMEOUT_PRESENT&gt;] [&lt;PRESENCE_MODE&gt;] [&lt;PRESENCE_ADDRESS&gt;]</code><br>
         <br>
         or, if 73_PRESENCE.pm is not available:<br>
         <br>
@@ -1198,6 +1228,7 @@ sub FireTV_Remote($;$$$) {
         Example: <code>define FIRETV FireTV 192.168.178.66 /usr/local/bin/adb</code>
         <br><br>
         <b>IP</b> is the ip-address of your FireTV-device<br>
+        <b>PORT</b> is the port where adb listens on the FireTV-device. It shouldn't be necessary to ever set this parameter. Default: 5555<br> 
         <b>ADB_PATH</b> is the full path to your adb-binary. Default: /usr/bin/adb<br>
         <b>PRESENCE_TIMEOUT_ABSENT</b> timeout (in seconds) to the next presence check if the device is absent. Default: 30<br>
         <b>PRESENCE_TIMEOUT_PRESENT</b> timeout (in seconds) to the next presence check if the device is present. Default: &lt;PRESENCE_TIMEOUT_ABSENT&gt;<br>

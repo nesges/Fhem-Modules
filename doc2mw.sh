@@ -10,4 +10,4 @@ while($w ne $f) {
     $w=~s/(<pre>.*?)(?<!<br\/><tt>)[\r\n]+(.*?<\/pre>)/$1<\/tt><br\/><tt>$2/sg; 
 }
 $f=~s/<(\/?)pre>/<$1tt>/sg; 
-print $f' $1 | pandoc --from html --to mediawiki | sed -e 's/<code>/<tt>/g' | sed -e 's/<\/code>/<\/tt>/g' | sed -e 's/===/=/g'
+print $f' $1 # | pandoc --from html --to mediawiki | sed -e 's/<code>/<tt>/g' | sed -e 's/<\/code>/<\/tt>/g' | sed -e 's/===/=/g'

@@ -1,3 +1,9 @@
+2017-03-15
+ added LEANBACK_LAUNCHER
+ added PORT internal
+ added deviceid to adb calls
+ added hint to 'apt-get install android-tools-adb' to documentation
+ some minor bugfixes
 2017-03-08
  removed $Id$
 2017-03-08
