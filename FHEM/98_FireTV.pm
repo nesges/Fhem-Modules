@@ -741,10 +741,11 @@ sub FireTV_app($$;$) {
     
     if(FireTV_wakeup($hash)) {
         if($action eq 'start') {
+            my $response;
             # try LEANBACK_LAUNCHER intent
             Log3 $name, 4, "[$name] FireTV_app: trying LEANBACK_LAUNCHER for $app";
             if(FireTV_adb($hash, "shell monkey -p $app -c android.intent.category.LEANBACK_LAUNCHER 1")) {
-                my $response = $hash->{helper}{$name}{lastadbresponse};
+                $response = $hash->{helper}{$name}{lastadbresponse};
                 if($response !~ /No activities found to run, monkey aborted/i) {
                     return $app.' started';
                 }
@@ -753,7 +754,7 @@ sub FireTV_app($$;$) {
             # try LAUNCHER intent
             Log3 $name, 4, "[$name] FireTV_app: trying LAUNCHER for $app";
             if(FireTV_adb($hash, "shell monkey -p $app -c android.intent.category.LAUNCHER 1")) {
-                my $response = $hash->{helper}{$name}{lastadbresponse};
+                $response = $hash->{helper}{$name}{lastadbresponse};
                 if($response !~ /No activities found to run, monkey aborted/i) {
                     return $app.' started';
                 }
