@@ -1,4 +1,6 @@
 2017-03-15
+ Version 0.5
+2017-03-15
  added LEANBACK_LAUNCHER
  added PORT internal
  added deviceid to adb calls
