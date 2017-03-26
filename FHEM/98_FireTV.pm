@@ -110,7 +110,7 @@ sub FireTV_Define($$) {
     $hash->{ADB}        = $param[3] || '/usr/bin/adb';
     $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.5';
+    $hash->{VERSION}    = '0.5.1';
     
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
@@ -139,7 +139,7 @@ sub FireTV_Undef($$) {
     }
     # own
     if(defined($hash->{helper}{$name}{'blockingcall'})) {
-        foreach my $blockingcall (keys($hash->{helper}{$name}{'blockingcall'})) {
+        foreach my $blockingcall ( keys(@{$hash->{helper}{$name}{'blockingcall'}}) ) {
             BlockingKill($blockingcall->{RUNNING_PID});
         }
     }
