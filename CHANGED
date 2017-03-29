@@ -1,3 +1,5 @@
+2017-03-29
+ Version 0.5.2
 2017-03-26
  fix for PERL WARNING: keys on reference is experimental at ./FHEM/98_FireTV.pm line 142
 2017-03-15
