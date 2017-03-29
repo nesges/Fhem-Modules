@@ -71,7 +71,7 @@ sub FireTV_Define($$) {
     if(LoadModule("PRESENCE") eq "PRESENCE") {
         $hash->{helper}{$name}{'PRESENCE_loaded'} = 1;
     } else {
-        Log3 $name, 3, "[$name] FireTV_Initialize WARNING: couldn't load module PRESENCE";
+        Log3 $name, 3, "[$name] FireTV_Define WARNING: couldn't load module PRESENCE";
         $hash->{helper}{$name}{'PRESENCE_loaded'} = 0;       
     }
     
@@ -110,7 +110,7 @@ sub FireTV_Define($$) {
     $hash->{ADB}        = $param[3] || '/usr/bin/adb';
     $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.5.1';
+    $hash->{VERSION}    = '0.5.2';
     
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
@@ -123,6 +123,7 @@ sub FireTV_Define($$) {
         PRESENCE_StartLocalScan($hash, 1);
     }
 
+    Log3 $name, 4, "[$name] FireTV_Define: getting packagelist";
     FireTV_Get($hash, $name, 'packages');
     return undef;
 }
@@ -169,9 +170,14 @@ sub FireTV_Get($@) {
 	            my ($package, $apk) = split('=', $line);
 	            push @apk, $apk;
 	        }
-	        @apk = sort(@apk);
-	        $hash->{helper}{$name}{'packages'} = join(',', @apk);
-	        return "Found the following installed packages: \n\n".join("\n", @apk);
+	        if(@apk > 0) {
+	            @apk = sort(@apk);
+	            $hash->{helper}{$name}{'packages'} = join(',', @apk);
+	            return "Found the following installed packages: \n\n".join("\n", @apk);
+	        } else {
+	            Log3 $name, 4, "[$name] FireTV_Get: no userpackages found";
+	        }
+	        return "no userpackages found";
 	    } else {
 	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
 	    }
@@ -543,7 +549,7 @@ sub FireTV_adb($$) {
         $hash->{helper}{$name}{lastadbresponse} = `$hash->{helper}{$name}{lastadbcmd} 2>&1` || '';
         
         # check if adb server needs a restart
-        if($hash->{helper}{$name}{lastadbresponse} =~ /cannot bind 'tcp:5037'/) {
+        if($hash->{helper}{$name}{lastadbresponse} =~ /cannot bind '.*?:5037'/) {
             Log3 $name, 4, "[$name] FireTV_adb response: ".$hash->{helper}{$name}{lastadbresponse};
             Log3 $name, 4, "[$name] FireTV_adb: restarting adb server and repeating last command";
             system($hash->{ADB}." kill-server");
