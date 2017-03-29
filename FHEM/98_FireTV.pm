@@ -107,8 +107,9 @@ sub FireTV_Define($$) {
     } else {
         $hash->{PORT} = '5555';
     }
-    $hash->{ADB}        = $param[3] || '/usr/bin/adb';
+    $hash->{ADB}        = $param[3] || 'sudo /usr/bin/adb';
     $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
+    $hash->{OSVERSION}  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
     $hash->{STATE}      = 'defined';
     $hash->{VERSION}    = '0.5.2';
     
