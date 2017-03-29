@@ -1,3 +1,6 @@
+2017-03-30
+ Version 0.5.3
+ added FireTV_connect to FireTV_ReadDeviceInfo
 2017-03-29
  Version 0.5.2
  add sudo option; better support for attribute disable

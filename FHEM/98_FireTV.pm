@@ -115,7 +115,7 @@ sub FireTV_Define($$) {
     }
     $hash->{ADB}       .= $param[3] || '/usr/bin/adb';
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.5.2';
+    $hash->{VERSION}    = '0.5.3';
     FireTV_ReadDeviceInfo($hash);
     
     
@@ -146,9 +146,14 @@ sub FireTV_ReadDeviceInfo($) {
 
     if(! IsDisabled($name)) {
         $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
-        $hash->{OSVERSION}  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
-        $hash->{OSNAME}     = `$hash->{ADB} shell getprop ro.build.version.name 2>&1` || $!;
-        $hash->{SERIAL}     = `$hash->{ADB} shell getprop ro.serialno 2>&1` || $!;
+	if(FireTV_connect($hash)) {
+            my $OSVERSION  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
+            my $OSNAME     = `$hash->{ADB} shell getprop ro.build.version.name 2>&1` || $!;
+            my $SERIAL     = `$hash->{ADB} shell getprop ro.serialno 2>&1` || $!;
+            $hash->{OSVERSION}  = $OSVERSION if $OSVERSION !~ /^error:/;
+            $hash->{OSNAME}     = $OSNAME if $OSNAME !~ /^error:/;
+            $hash->{SERIAL}     = $SERIAL if $SERIAL !~ /^error:/;
+        }
     }
 }
 
