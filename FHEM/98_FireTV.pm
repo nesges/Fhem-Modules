@@ -110,6 +110,8 @@ sub FireTV_Define($$) {
     $hash->{ADB}        = $param[3] || 'sudo /usr/bin/adb';
     $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
     $hash->{OSVERSION}  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
+    $hash->{OSNAME}     = `$hash->{ADB} getprop ro.build.version.name 2>&1` || $!;
+    $hash->{SERIAL}     = `$hash->{ADB} getprop ro.serialno 2>&1` || $!;
     $hash->{STATE}      = 'defined';
     $hash->{VERSION}    = '0.5.2';
     
@@ -193,9 +195,17 @@ sub FireTV_Get($@) {
 	    } else {
 	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
 	    }
+	    
+    } elsif($opt eq 'getprop') {
+	    if(FireTV_adb($hash, 'shell getprop')) {
+	        my @response = split(/[\n\r]+/, $hash->{helper}{$name}{'lastadbresponse'});
+	        return join("\n", @response);
+	    } else {
+	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
+	    }
 
 	} else {
-	    return "Unknown argument $opt, choose one of packages:noArg isapprunning:".$hash->{helper}{$name}{'packages'}." adb ";
+	    return "Unknown argument $opt, choose one of packages:noArg isapprunning:".$hash->{helper}{$name}{'packages'}." adb getprop:noArg ";
 	}
 	return undef;
 }
