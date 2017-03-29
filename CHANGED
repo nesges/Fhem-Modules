@@ -1,5 +1,9 @@
 2017-03-29
  Version 0.5.2
+ add sudo option; better support for attribute disable
+ new internal OSNAME; get getprop
+ new internal OSVERSION
+ minor logging changes, test on empty package-list, more generalized regex in adb server check
 2017-03-26
  fix for PERL WARNING: keys on reference is experimental at ./FHEM/98_FireTV.pm line 142
 2017-03-15
