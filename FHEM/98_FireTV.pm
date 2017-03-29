@@ -53,6 +53,7 @@ sub FireTV_Initialize($) {
                                 ." absenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20"
                                 ." presenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20"
                                 ." absenceTimeout presenceTimeout "
+                                ." sudo "
                                 ." do_not_notify:0,1 disable:0,1 disabledForIntervals "; # disabledForIntervals seems to be broken - TODO
     }
     
@@ -77,14 +78,20 @@ sub FireTV_Define($$) {
     
     if(int(@param) < 3) {
         if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
-            return "too few parameters: define <name> FireTV <IP> [<ADB_PATH>] [<PRESENCE_TIMEOUT_ABSENT>] [<PRESENCE_TIMEOUT_PRESENT>] [<PRESENCE_MODE>] [<PRESENCE_ADDRESS>]";
+            return "too few parameters: define <name> FireTV <HOST[:PORT]> [sudo] [<ADB_PATH>] [<PRESENCE_TIMEOUT_ABSENT>] [<PRESENCE_TIMEOUT_PRESENT>] [<PRESENCE_MODE>] [<PRESENCE_ADDRESS>]";
         } else {
-            return "too few parameters: define <name> FireTV <IP> [<ADB_PATH>]";
+            return "too few parameters: define <name> FireTV <HOST[:PORT]> [sudo] [<ADB_PATH>]";
         }
     }
     
-    if(defined($param[2]) && $param[2]!~/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d{1,5})?$/) {
-        return "IP '".$param[3]."' is no valid ip address";
+    if(defined($param[2]) && $param[2]!~/^[a-z0-9-.]+(:\d{1,5})?$/i) {
+        return "IP '".$param[2]."' is no valid ip address or hostname";
+    }
+    if(defined($param[3]) && $param[3] eq "sudo") {
+        splice @param, 3, 1;
+        $hash->{ADB} = 'sudo ';
+    } else {
+        $hash->{ADB} = '';
     }
     if(defined($param[3]) && ! -x $param[3]) {
         return "ADB_PATH '".$param[3]."' is not executable";
@@ -107,13 +114,11 @@ sub FireTV_Define($$) {
     } else {
         $hash->{PORT} = '5555';
     }
-    $hash->{ADB}        = $param[3] || 'sudo /usr/bin/adb';
-    $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
-    $hash->{OSVERSION}  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
-    $hash->{OSNAME}     = `$hash->{ADB} getprop ro.build.version.name 2>&1` || $!;
-    $hash->{SERIAL}     = `$hash->{ADB} getprop ro.serialno 2>&1` || $!;
+    $hash->{ADB}       .= $param[3] || '/usr/bin/adb';
     $hash->{STATE}      = 'defined';
     $hash->{VERSION}    = '0.5.2';
+    FireTV_ReadDeviceInfo($hash);
+    
     
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
@@ -123,12 +128,29 @@ sub FireTV_Define($$) {
         $hash->{MODE}               = $param[6] || 'lan-ping';
         $hash->{ADDRESS}            = $param[7] || $hash->{IP};
         
-        PRESENCE_StartLocalScan($hash, 1);
+        if(! IsDisabled($name)) {
+            PRESENCE_StartLocalScan($hash, 1);
+        }
     }
 
     Log3 $name, 4, "[$name] FireTV_Define: getting packagelist";
     FireTV_Get($hash, $name, 'packages');
     return undef;
+}
+
+sub FireTV_ReadDeviceInfo($) {
+    my $hash = shift; 
+    if(ref $hash ne 'HASH' ) {
+        $hash = $defs{$hash};
+    }
+    my $name = $hash->{NAME};
+
+    if(! IsDisabled($name)) {
+        $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
+        $hash->{OSVERSION}  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
+        $hash->{OSNAME}     = `$hash->{ADB} shell getprop ro.build.version.name 2>&1` || $!;
+        $hash->{SERIAL}     = `$hash->{ADB} shell getprop ro.serialno 2>&1` || $!;
+    }
 }
 
 sub FireTV_Undef($$) {
@@ -487,6 +509,7 @@ sub FireTV_Attr(@) {
 		        RemoveInternalTimer($hash);
 		    } else {
 		        $hash->{STATE} = 'defined';
+		        FireTV_ReadDeviceInfo($hash);
 		        PRESENCE_StartLocalScan($hash, 1);
 		    }
 		    readingsSingleUpdate($hash, "state", $hash->{STATE}, 1);
@@ -495,6 +518,14 @@ sub FireTV_Attr(@) {
         if($err) {
             Log3 $name, 3, "[$name] FireTV_Attr ERROR: $err";
 			return $err;
+		}
+    
+    } elsif($cmd eq "del") {
+        if($attr_name eq "disable") {
+            $hash->{STATE} = 'defined';
+		    FireTV_ReadDeviceInfo($hash);
+		    PRESENCE_StartLocalScan($hash, 1);
+		    readingsSingleUpdate($hash, "state", $hash->{STATE}, 1);
 		}
     }
 	return undef;
@@ -1237,7 +1268,7 @@ sub FireTV_Remote($;$$$) {
     <a name="FireTVdefine"></a>
     <b>Define</b>
     <ul>
-        <code>define &lt;name&gt; FireTV &lt;IP[:PORT]&gt; [&lt;ADB_PATH&gt;] [&lt;PRESENCE_TIMEOUT_ABSENT&gt;] [&lt;PRESENCE_TIMEOUT_PRESENT&gt;] [&lt;PRESENCE_MODE&gt;] [&lt;PRESENCE_ADDRESS&gt;]</code><br>
+        <code>define &lt;name&gt; FireTV &lt;HOST[:PORT]&gt; [sudo] [&lt;ADB_PATH&gt;] [&lt;PRESENCE_TIMEOUT_ABSENT&gt;] [&lt;PRESENCE_TIMEOUT_PRESENT&gt;] [&lt;PRESENCE_MODE&gt;] [&lt;PRESENCE_ADDRESS&gt;]</code><br>
         <br>
         or, if 73_PRESENCE.pm is not available:<br>
         <br>
@@ -1245,8 +1276,9 @@ sub FireTV_Remote($;$$$) {
         <br>
         Example: <code>define FIRETV FireTV 192.168.178.66 /usr/local/bin/adb</code>
         <br><br>
-        <b>IP</b> is the ip-address of your FireTV-device<br>
+        <b>HOST</b> is the ip-address or hostname of your FireTV-device<br>
         <b>PORT</b> is the port where adb listens on the FireTV-device. It shouldn't be necessary to ever set this parameter. Default: 5555<br> 
+        <b>sudo</b> the keyword sudo ensures that adb is called using sudo. You need to add an entry for your fhem-user to call adb without password in /etc/sudoers
         <b>ADB_PATH</b> is the full path to your adb-binary. Default: /usr/bin/adb<br>
         <b>PRESENCE_TIMEOUT_ABSENT</b> timeout (in seconds) to the next presence check if the device is absent. Default: 30<br>
         <b>PRESENCE_TIMEOUT_PRESENT</b> timeout (in seconds) to the next presence check if the device is present. Default: &lt;PRESENCE_TIMEOUT_ABSENT&gt;<br>
