@@ -115,7 +115,7 @@ sub FireTV_Define($$) {
     }
     $hash->{ADB}       .= $param[3] || '/usr/bin/adb';
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.5.3';
+    $hash->{VERSION}    = '0.6';
     FireTV_ReadDeviceInfo($hash);
     
     
@@ -146,7 +146,8 @@ sub FireTV_ReadDeviceInfo($) {
 
     if(! IsDisabled($name)) {
         $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
-	if(FireTV_connect($hash)) {
+	    
+	    if(FireTV_connect($hash)) {
             my $OSVERSION  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
             my $OSNAME     = `$hash->{ADB} shell getprop ro.build.version.name 2>&1` || $!;
             my $SERIAL     = `$hash->{ADB} shell getprop ro.serialno 2>&1` || $!;
@@ -191,6 +192,12 @@ sub FireTV_Get($@) {
         return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
     }
 	
+	my $screen_state;
+	if($opt) {
+	    # update screen_state reading
+	    $screen_state = FireTV_screen_state($hash);
+	}
+	
 	if($opt eq 'packages') {
 	    if(FireTV_adb($hash, 'shell pm list packages -f -3')) {
 	        my @response = split(/[\n\r]+/, $hash->{helper}{$name}{'lastadbresponse'});
@@ -230,8 +237,24 @@ sub FireTV_Get($@) {
 	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
 	    }
 
+    } elsif($opt eq 'screen_state') {
+	    # $screen_state is updated on every $opt (see above)
+	    if($screen_state) {
+	        return $screen_state;
+	    } else {
+	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
+	    }
+
+    } elsif($opt eq 'currentapp') {
+	    my $currentapp = FireTV_currentFocus($hash);
+	    if($currentapp) {
+	        return $currentapp ;
+	    } else {
+	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
+	    }
+
 	} else {
-	    return "Unknown argument $opt, choose one of packages:noArg isapprunning:".$hash->{helper}{$name}{'packages'}." adb getprop:noArg ";
+	    return "Unknown argument $opt, choose one of packages:noArg isapprunning:".$hash->{helper}{$name}{'packages'}." adb getprop:noArg screen_state:noArg currentapp:noArg";
 	}
 	return undef;
 }
@@ -249,6 +272,9 @@ sub FireTV_Set($@) {
 	if($opt =~ /^(appstart|appstop|apptoggle|button|screen|window|search|upload|uploadandview|view|deletefile|install|adb|screenshot)$/) {
 	    # $opt that need an adb-connection
 	    if(FireTV_connect($hash)) {
+	        # update screen_state reading
+	        FireTV_screen_state($hash);
+
 	        if($opt eq 'appstart') {
 	            $response = FireTV_app($hash, $value, 'start');
 	        } elsif($opt eq 'appstop') {
@@ -552,6 +578,8 @@ sub FireTV_Notify($$) {
                 if($event eq 'present' && OldValue($name) eq 'absent') {
                     Log3 $name, 4, "[$name] FireTV_Notify: changed state from absent to present; reread packages";
                     FireTV_Get($hash, $name, 'packages');
+                    Log3 $name, 4, "[$name] FireTV_Notify: changed state from absent to present; reread device info";
+                    FireTV_ReadDeviceInfo($hash);
                 }
             }
         } else {
@@ -724,6 +752,65 @@ sub FireTV_sleep($) {
     return undef;
 }
 
+# inspired by https://github.com/happyleavesaoc/python-firetv
+sub FireTV_dumpsys($$) {
+    my $hash = shift;
+    my $service = shift;
+    
+    if(ref $hash ne 'HASH' ) {
+        $hash = $defs{$hash};
+    }
+    my $name = $hash->{NAME};
+    
+    if(FireTV_adb($hash, "shell dumpsys $service")) {
+        return $hash->{helper}{$name}{lastadbresponse};
+    }
+    return;
+}
+
+sub FireTV_dumpsys_has($$$) {
+    my $hash = shift;
+    my $service = shift;
+    my $regex = shift;
+    
+    my $dump = FireTV_dumpsys($hash, $service);
+    
+    return $dump =~ $regex;
+}
+
+sub FireTV_currentFocus($) {
+    my $hash = shift;
+    
+    my $dump = FireTV_dumpsys($hash, "window windows");
+    if($dump =~ /mCurrentFocus=Window\{.*?\s.*?\s(.*?)\}/) {
+        return $1;
+    }
+    return;
+}
+
+sub FireTV_screen_state($) {
+    my $hash = shift;
+    
+    my $screen_state;
+    if(! FireTV_dumpsys_has($hash, 'power', 'Display Power: state=ON')) {
+        $screen_state = 'off';
+    } elsif(! FireTV_dumpsys_has($hash, 'power', 'mWakefulness=Awake')) {
+        if(FireTV_currentFocus($hash) =~ /^dream$/) {
+            $screen_state = 'daydream';
+        } else {
+            $screen_state = 'idle';
+        }
+    } elsif(FireTV_currentFocus($hash) =~ /^com.amazon.tv.launcher/) {
+        $screen_state = 'standby'
+    } elsif(! FireTV_dumpsys_has($hash, 'power', 'Locks: size=0')) {
+       $screen_state = 'playing'
+    } else {
+        $screen_state = 'paused'
+    }
+    
+    readingsSingleUpdate($hash, "screen_state", $screen_state, 1);
+    return $screen_state;
+}
 
 # complex actions
 
@@ -744,20 +831,36 @@ sub FireTV_search_only($$) {
     my $hash = shift;
     my $text = shift;
     
-    # may need some fine tuning
+    if(ref $hash ne 'HASH' ) {
+        $hash = $defs{$hash};
+    }
+    
+    my $osversion = 0;
+    if($hash->{OSVERSION} =~ /\((\d+)\)/ ) {
+        $osversion = $1;
+    }
+    
     if(FireTV_wakeup($hash)) {
         usleep(5000);
-        if(FireTV_home($hash)) {
-            usleep(5000);
-            if(FireTV_home($hash)) {
-                if(FireTV_up($hash)) {
-                    if(FireTV_enter($hash)) {
-                        if($text) {
-                            if(FireTV_text($hash,$text)) {
-                                return FireTV_next($hash);
-                            }
-                        }
-                    }
+        FireTV_home($hash);
+        usleep(5000);
+        FireTV_home($hash);
+        # we're on the homescreen now
+        if($osversion && $osversion < 573210520) {
+            # search is 'up' on older ui versions
+            FireTV_up($hash);
+            usleep(200);
+        } else {
+            # ...and 'left' on newer builds
+            FireTV_left($hash);
+            usleep(200);
+        }
+        if(FireTV_enter($hash)) {
+            usleep(200);
+            if($text) {
+                # input searchtext
+                if(FireTV_text($hash,$text)) {
+                    return FireTV_next($hash);
                 }
             }
         }
@@ -1297,10 +1400,16 @@ sub FireTV_Remote($;$$$) {
         <ul>
             <li><i>adb &lt;COMMAND&gt;</i><br>
                 Execute an adb command on your firetv and return it's response. Try <i>adb help</i>.</li>
+            <li><i>currentapp</i><br>
+                Returns the package name off the currently active app</li>
             <li><i>isapprunning &lt;PACKAGE&gt;</i><br>
                 Returns the PID of a running app, or 0 if not running</li>
+            <li><i>getprop</i><br>
+                Returns all of fires system properties</li>
             <li><i>packages</i><br>
                 Reads the list of installed packages on your firetv and stores it internally. <i>get packages</i> is called automatically when the device changes state from absent to present to populate the select-boxes for some other commands (e.g. appstart) in FHEMWEB</li>
+            <li><i>screen_state</i><br>
+                Returns the current screen status. May be one off: off, idle, daydream, standby, playing, paused</li>
         </ul>
     </ul>
     

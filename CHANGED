@@ -1,3 +1,8 @@
+2017-05-05
+ Version 0.6
+ added get screen_state, get currentapp (dumpsys)
+ modified FireTV_search_only to fit the new firetv ui
+ new call to FireTV_ReadDeviceInfo in FireTV_Notify
 2017-03-30
  Version 0.5.3
  added FireTV_connect to FireTV_ReadDeviceInfo
