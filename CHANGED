@@ -1,3 +1,5 @@
+2017-05-14
+ bugfix: set text added to $opt condition
 2017-05-05
  Version 0.6
  added get screen_state, get currentapp (dumpsys)

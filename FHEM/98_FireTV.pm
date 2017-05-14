@@ -115,7 +115,7 @@ sub FireTV_Define($$) {
     }
     $hash->{ADB}       .= $param[3] || '/usr/bin/adb';
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.6';
+    $hash->{VERSION}    = '0.6.1';
     FireTV_ReadDeviceInfo($hash);
     
     
@@ -269,7 +269,7 @@ sub FireTV_Set($@) {
 	my $value = join(" ", @param);
 	my $response = undef;
 	
-	if($opt =~ /^(appstart|appstop|apptoggle|button|screen|window|search|upload|uploadandview|view|deletefile|install|adb|screenshot)$/) {
+	if($opt =~ /^(appstart|appstop|apptoggle|button|screen|window|search|text|upload|uploadandview|view|deletefile|install|adb|screenshot)$/) {
 	    # $opt that need an adb-connection
 	    if(FireTV_connect($hash)) {
 	        # update screen_state reading
@@ -435,6 +435,8 @@ sub FireTV_Set($@) {
             } elsif($opt eq 'adb') {
 	            $response = FireTV_adb($hash, $value);
             }
+        } else {
+            $response = "error: Couldn't connect to FireTV ".$hash->{NAME}." (".$hash->{IP}.")";
         }
 	} elsif($opt =~ /^(connect|disconnect|statusRequest)$/) {
 	    if($opt eq 'connect') {
