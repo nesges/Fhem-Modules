@@ -33,6 +33,8 @@ sub FireTV_Set($@);
 sub FireTV_Get($@);
 sub FireTV_Attr(@);
 sub FireTV_Notify($$);
+sub FireTV_SetTimer($;$);
+sub FireTV_FetchStatus($);
 
 sub FireTV_Initialize($) {
     my ($hash) = @_;
@@ -42,7 +44,7 @@ sub FireTV_Initialize($) {
     $hash->{SetFn}      = 'FireTV_Set';
     $hash->{GetFn}      = 'FireTV_Get';
     $hash->{AttrFn}     = 'FireTV_Attr';
-    $hash->{AttrList}   = "holdconnection:yes,no screenshotpath upviewdeleteafter uploaddeleteafter remotehtml ".$readingFnAttributes;
+    $hash->{AttrList}   = "holdconnection:yes,no screenshotpath upviewdeleteafter uploaddeleteafter remotehtml interval ".$readingFnAttributes;
     
     if(LoadModule("PRESENCE") eq "PRESENCE") {    
         # PRESENCE    
@@ -134,6 +136,9 @@ sub FireTV_Define($$) {
 
     Log3 $name, 4, "[$name] FireTV_Define: getting packagelist";
     FireTV_Get($hash, $name, 'packages');
+    
+    Log3 $name, 4, "[$name] FireTV_Define: starting FireTV_SetTimer";
+    FireTV_SetTimer($hash);
     return undef;
 }
 
@@ -148,12 +153,26 @@ sub FireTV_ReadDeviceInfo($) {
         $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
 	    
 	    if(FireTV_connect($hash)) {
-            my $OSVERSION  = `$hash->{ADB} shell cat /proc/version 2>&1` || $!;
-            my $OSNAME     = `$hash->{ADB} shell getprop ro.build.version.name 2>&1` || $!;
-            my $SERIAL     = `$hash->{ADB} shell getprop ro.serialno 2>&1` || $!;
-            $hash->{OSVERSION}  = $OSVERSION if $OSVERSION !~ /^error:/;
-            $hash->{OSNAME}     = $OSNAME if $OSNAME !~ /^error:/;
-            $hash->{SERIAL}     = $SERIAL if $SERIAL !~ /^error:/;
+            if(FireTV_adb($hash, 'shell cat /proc/version')) {
+                my $OSVERSION  = $hash->{helper}{$name}{'lastadbresponse'};
+                $hash->{OSVERSION}  = $OSVERSION if $OSVERSION !~ /error:/;
+            } else {
+                Log3 $name, 4, "[$name] FireTV_ReadDeviceInfo: error reading OSVERSION";
+            }
+            
+            if(FireTV_adb($hash, 'shell getprop ro.build.version.name')) {
+                my $OSNAME  = $hash->{helper}{$name}{'lastadbresponse'};
+                $hash->{OSVERSION}  = $OSNAME if $OSNAME !~ /error:/;
+            } else {
+                Log3 $name, 4, "[$name] FireTV_ReadDeviceInfo: error reading OSNAME";
+            }
+            
+            if(FireTV_adb($hash, 'shell getprop ro.serialno')) {
+                my $SERIAL  = $hash->{helper}{$name}{'lastadbresponse'};
+                $hash->{SERIAL}  = $SERIAL if $SERIAL !~ /error:/;
+            } else {
+                Log3 $name, 4, "[$name] FireTV_ReadDeviceInfo: error reading SERIAL";
+            }
         }
     }
 }
@@ -1349,6 +1368,57 @@ sub FireTV_Remote($;$$$) {
     return $html;
 }
 
+sub FireTV_SetTimer($;$) {
+    my ($hash, $start) = @_;
+    my $nextTrigger;
+    my $name = $hash->{NAME};
+    my $now  = gettimeofday();
+    $start   = 0 if (!$start);
+
+    my $interval = AttrVal($name, 'interval', 0);
+    if($interval) {
+        if ($hash->{TimeAlign}) {
+            my $count = int(($now - $hash->{TimeAlign} + $start) / $interval);
+            my $curCycle = $hash->{TimeAlign} + $count * $interval;
+            $nextTrigger = $curCycle + $interval;
+        } else {
+            $nextTrigger = $now + ($start ? $start : $interval);
+        }
+        
+        $hash->{TRIGGERTIME}     = $nextTrigger;
+        $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
+        RemoveInternalTimer("update:$name");
+        Log3 $name, 4, "[$name] FireTV_SetTimer: set InternalTimer";
+        InternalTimer($nextTrigger, "FireTV_FetchStatus", "$name", 0);
+    } else {
+       $hash->{TRIGGERTIME}     = 0;
+       $hash->{TRIGGERTIME_FMT} = "";
+    }
+}
+
+sub FireTV_FetchStatus($) {
+    my $hash = shift;
+    if(ref $hash ne 'HASH' ) {
+        $hash = $defs{$hash};
+    }
+    my $name = $hash->{NAME};
+    
+    if($hash->{STATE} eq 'absent' ) {
+        Log3 $name, 4, "[$name] FireTV_FetchStatus: Device is absent. Skipping";
+    } elsif(!IsDisabled($name) && (!defined($attr{$name}{disabled}) || $attr{$name}{disabled} ne 'yes')) {
+        $hash->{BUSY}            = 1;
+        $hash->{LASTSEND}        = gettimeofday();
+
+        Log3 $name, 4, "[$name] FireTV_FetchStatus: starting FireTV_screen_state";
+        FireTV_screen_state($hash);
+        $hash->{BUSY}            = 0;
+    } else {
+        $hash->{STATE}           = 'disabled';
+        Log3 $name, 4, "[$name] FireTV_FetchStatus: Device is disabled. Skipping";
+    }
+    FireTV_SetTimer($hash);
+}
+
 1;
 
 =pod
@@ -1492,6 +1562,8 @@ sub FireTV_Remote($;$$$) {
     <b>Attributes</b>
     <ul>
         <ul>
+            <li><i>interval</i> &lt;SECONDS&gt;<br>
+                Setting interval to a number greater than 0 activates a cyclic refresh of screen_state every interval seconds</li>
             <li><i>holdconnection</i> yes|no<br>
                 "yes" to keep the adb connection open or "no" to close it after every command. Default: no</li>
             <li><i>remotehtml</i> &lt;HTML&gt;<br>
