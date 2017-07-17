@@ -117,7 +117,7 @@ sub FireTV_Define($$) {
     }
     $hash->{ADB}       .= $param[3] || '/usr/bin/adb';
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.6.1';
+    $hash->{VERSION}    = '0.6.2';
     FireTV_ReadDeviceInfo($hash);
     
     
