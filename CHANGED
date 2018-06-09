@@ -1,3 +1,5 @@
+2018-06-09
+ replaced POSIX::tmpnam by File::Temp
 2017-07-17
  Zyklischer Refresh von screen_state per Attribut interval
 2017-05-14

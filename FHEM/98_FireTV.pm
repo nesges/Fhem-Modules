@@ -15,7 +15,7 @@
 # uses 73_PRESENCE.pm by Markus Bloch
 # uses File::MimeInfo by Michiel Beijen
 #
-# 2017 by Thomas Nesges <thomas@nesges.eu>
+# 2018 by Thomas Nesges <thomas@nesges.eu>
 ########################################################################
 
 package main;
@@ -23,8 +23,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes;
-use POSIX qw(tmpnam);
-use File::Temp qw(tempdir);
+use File::Temp qw(tempdir tempfile);
 
 sub FireTV_Initialize($);
 sub FireTV_Define($$);
@@ -117,7 +116,7 @@ sub FireTV_Define($$) {
     }
     $hash->{ADB}       .= $param[3] || '/usr/bin/adb';
     $hash->{STATE}      = 'defined';
-    $hash->{VERSION}    = '0.6.2';
+    $hash->{VERSION}    = '0.6.1';
     FireTV_ReadDeviceInfo($hash);
     
     
@@ -1036,7 +1035,7 @@ sub FireTV_screenshot($) {
             if(FireTV_adb($hash, "shell screencap -p $remote_tempfile")) {
                 my $localfile;
                 if(!defined($attr{$name}{screenshotpath})) {
-                    $localfile = tmpnam();
+                    my ($fh, $localfile) = tempfile();
                 } elsif(-d $attr{$name}{screenshotpath}) {
                     $localfile = FireTV_localtempfile($hash, $attr{$name}{screenshotpath}, '.png')
                 } else {
@@ -1571,7 +1570,7 @@ sub FireTV_FetchStatus($) {
             <li><i>screenshotpath</i> &lt;PATH&gt;<br>
                 If <i>screenshotpath</i> is set to a filename, every new screenshot (see <i>set screenshot</i>) will overwrite that file. 
                 If set to a directory, a random file will be created in that directory. 
-                If not set, a random file is created in your systems tempdirectory (POSIX tmpnam). Default: not set</li>
+                If not set, a random file is created in your systems tempdirectory. Default: not set</li>
             <li><i>uploaddeleteafter</i> &lt;SECONDS&gt;<br>
                 Files uploaded via <i>set upload</i> are deleted after SECONDS when set to a positve integer number. Default: not set</li>
             <li><i>upviewdeleteafter</i> &lt;SECONDS&gt;<br>
