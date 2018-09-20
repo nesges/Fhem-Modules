@@ -123,8 +123,8 @@ sub FireTV_Define($$) {
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
         $hash->{NOTIFYDEV}          = "global,$name";
-        $hash->{INTERVAL_NORMAL}    = $param[4] || 30;
-        $hash->{INTERVAL_PRESENT}   = $param[5] || $hash->{INTERVAL_NORMAL};
+        $hash->{TIMEOUT_NORMAL}     = $param[4] || 30;
+        $hash->{TIMEOUT_PRESENT}    = $param[5] || $hash->{TIMEOUT_NORMAL};
         $hash->{MODE}               = $param[6] || 'lan-ping';
         $hash->{ADDRESS}            = $param[7] || $hash->{IP};
         
