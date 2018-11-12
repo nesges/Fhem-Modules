@@ -322,9 +322,9 @@ sub FireTV_Set($@) {
 	            } elsif($value eq 'menu') {
 	                $response = FireTV_menu($hash);
 	            } elsif($value eq 'prev') {
-	                $response = FireTV_playpause($hash);
+	                $response = FireTV_prev($hash);
 	            } elsif($value eq 'playpause') {
-	                $response = FireTV_enter($hash);
+	                $response = FireTV_playpause($hash);
 	            } elsif($value eq 'next') {
 	                $response = FireTV_next($hash);
 	            }	        
