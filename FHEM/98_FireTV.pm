@@ -1,8 +1,8 @@
-########################################################################
+﻿########################################################################
 # 98_FireTV.pm
 #
 # Control a FireTV-Device from FHEM
-# 
+#
 # Prerequisites:
 #   1.) enable adb debugging in your fire tv
 #   2.) get adb and copy the binary to /usr/bin/
@@ -44,10 +44,10 @@ sub FireTV_Initialize($) {
     $hash->{GetFn}      = 'FireTV_Get';
     $hash->{AttrFn}     = 'FireTV_Attr';
     $hash->{AttrList}   = "holdconnection:yes,no screenshotpath upviewdeleteafter uploaddeleteafter remotehtml interval ".$readingFnAttributes;
-    
-    if(LoadModule("PRESENCE") eq "PRESENCE") {    
-        # PRESENCE    
-        $hash->{ReadFn}     = "PRESENCE_Read";  
+
+    if(LoadModule("PRESENCE") eq "PRESENCE") {
+        # PRESENCE
+        $hash->{ReadFn}     = "PRESENCE_Read";
         $hash->{ReadyFn}    = "PRESENCE_Ready";
         $hash->{NotifyFn}   = "FireTV_Notify";
         $hash->{AttrList}  .= " ping_count:1,2,3,4,5,6,7,8,9,10"
@@ -56,7 +56,7 @@ sub FireTV_Initialize($) {
                                 ." absenceTimeout presenceTimeout "
                                 ." do_not_notify:0,1 disable:0,1 disabledForIntervals "; # disabledForIntervals seems to be broken - TODO
     }
-    
+
     # PORT was introduced later, set a default here to avoid users having to redefine their devices
     if(! defined($hash->{PORT})) {
         $hash->{PORT} = '5555';
@@ -66,16 +66,16 @@ sub FireTV_Initialize($) {
 sub FireTV_Define($$) {
     my ($hash, $def) = @_;
     my @param = split('[ \t]+', $def);
-    
+
     my $name = $param[0];
-    
+
     if(LoadModule("PRESENCE") eq "PRESENCE") {
         $hash->{helper}{$name}{'PRESENCE_loaded'} = 1;
     } else {
         Log3 $name, 3, "[$name] FireTV_Define WARNING: couldn't load module PRESENCE";
-        $hash->{helper}{$name}{'PRESENCE_loaded'} = 0;       
+        $hash->{helper}{$name}{'PRESENCE_loaded'} = 0;
     }
-    
+
     if(int(@param) < 3) {
         if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
             return "too few parameters: define <name> FireTV <HOST[:PORT]> [sudo] [<ADB_PATH>] [<PRESENCE_TIMEOUT_ABSENT>] [<PRESENCE_TIMEOUT_PRESENT>] [<PRESENCE_MODE>] [<PRESENCE_ADDRESS>]";
@@ -83,7 +83,7 @@ sub FireTV_Define($$) {
             return "too few parameters: define <name> FireTV <HOST[:PORT]> [sudo] [<ADB_PATH>]";
         }
     }
-    
+
     if(defined($param[2]) && $param[2]!~/^[a-z0-9-.]+(:\d{1,5})?$/i) {
         return "IP '".$param[2]."' is no valid ip address or hostname";
     }
@@ -105,7 +105,7 @@ sub FireTV_Define($$) {
     if(defined($param[6]) && $param[6]!~/^(lan-ping|lan-bluetooth|local-bluetooth|fritzbox|shellscript|function|event)$/) {
         return "PRESENCE_MODE '".$param[3]."' must be one of lan-ping, lan-bluetooth, local-bluetooth, fritzbox, shellscript, function or event";
     }
-    
+
     $hash->{NAME}       = $name;
     $hash->{IP}         = $param[2];
     if($hash->{IP} =~ m/(.*?):(.*)/) {
@@ -115,19 +115,19 @@ sub FireTV_Define($$) {
         $hash->{PORT} = '5555';
     }
     $hash->{ADB}       .= $param[3] || '/usr/bin/adb';
-    $hash->{STATE}      = 'defined';
+    #readingsSingleUpdate($hash, "state", "defined", 1);
     $hash->{VERSION}    = '0.6.1';
     FireTV_ReadDeviceInfo($hash);
-    
-    
+
+
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # PRESENCE
         $hash->{NOTIFYDEV}          = "global,$name";
-        $hash->{TIMEOUT_NORMAL}     = $param[4] || 30;
-        $hash->{TIMEOUT_PRESENT}    = $param[5] || $hash->{TIMEOUT_NORMAL};
+        $hash->{INTERVAL_NORMAL}     = $param[4] || 30;
+        $hash->{INTERVAL_PRESENT}    = $param[5] || $hash->{INTERVAL_NORMAL};
         $hash->{MODE}               = $param[6] || 'lan-ping';
         $hash->{ADDRESS}            = $param[7] || $hash->{IP};
-        
+
         if(! IsDisabled($name)) {
             PRESENCE_StartLocalScan($hash, 1);
         }
@@ -135,14 +135,14 @@ sub FireTV_Define($$) {
 
     Log3 $name, 4, "[$name] FireTV_Define: getting packagelist";
     FireTV_Get($hash, $name, 'packages');
-    
+
     Log3 $name, 4, "[$name] FireTV_Define: starting FireTV_SetTimer";
     FireTV_SetTimer($hash);
     return undef;
 }
 
 sub FireTV_ReadDeviceInfo($) {
-    my $hash = shift; 
+    my $hash = shift;
     if(ref $hash ne 'HASH' ) {
         $hash = $defs{$hash};
     }
@@ -150,7 +150,7 @@ sub FireTV_ReadDeviceInfo($) {
 
     if(! IsDisabled($name)) {
         $hash->{ADBVERSION} = `$hash->{ADB} version 2>&1` || $!;
-	    
+
 	    if(FireTV_connect($hash)) {
             if(FireTV_adb($hash, 'shell cat /proc/version')) {
                 my $OSVERSION  = $hash->{helper}{$name}{'lastadbresponse'};
@@ -158,14 +158,14 @@ sub FireTV_ReadDeviceInfo($) {
             } else {
                 Log3 $name, 4, "[$name] FireTV_ReadDeviceInfo: error reading OSVERSION";
             }
-            
+
             if(FireTV_adb($hash, 'shell getprop ro.build.version.name')) {
                 my $OSNAME  = $hash->{helper}{$name}{'lastadbresponse'};
                 $hash->{OSVERSION}  = $OSNAME if $OSNAME !~ /error:/;
             } else {
                 Log3 $name, 4, "[$name] FireTV_ReadDeviceInfo: error reading OSNAME";
             }
-            
+
             if(FireTV_adb($hash, 'shell getprop ro.serialno')) {
                 my $SERIAL  = $hash->{helper}{$name}{'lastadbresponse'};
                 $hash->{SERIAL}  = $SERIAL if $SERIAL !~ /error:/;
@@ -177,10 +177,10 @@ sub FireTV_ReadDeviceInfo($) {
 }
 
 sub FireTV_Undef($$) {
-    my ($hash, $arg) = @_; 
-    
+    my ($hash, $arg) = @_;
+
     my $name = $hash->{NAME};
-    
+
     RemoveInternalTimer($hash);
     # PRESENCE
     if(defined($hash->{helper}{RUNNING_PID})) {
@@ -192,30 +192,68 @@ sub FireTV_Undef($$) {
             BlockingKill($blockingcall->{RUNNING_PID});
         }
     }
-    DevIo_CloseDev($hash); 
+    DevIo_CloseDev($hash);
 
     return undef;
 }
 
+
+sub FireTV_UpdateState($) {
+    my ($hash) = @_;
+
+    my $name = $hash->{NAME};
+
+    RemoveInternalTimer($hash);
+
+    if(FireTV_connect($hash)) {
+      my $screen_state = FireTV_screen_state($hash);
+      my $currentapp = FireTV_currentFocus($hash);
+
+
+      readingsBeginUpdate( $hash );
+      readingsBulkUpdate( $hash, "screenState", $screen_state ) if($screen_state);
+      readingsBulkUpdate( $hash, "currentApp", $currentapp ) if($currentapp);
+      readingsBulkUpdate( $hash, "state", "connected" );
+      readingsEndUpdate( $hash, 1 );
+      InternalTimer( gettimeofday() + AttrVal($name, 'interval', 900), "FireTV_UpdateState", $hash, 0 );
+    } else {
+      readingsBeginUpdate( $hash );
+      readingsBulkUpdate( $hash, "screenState", "off" );
+      readingsBulkUpdate( $hash, "currentApp", "none" );
+      readingsBulkUpdate( $hash, "state", "disconnected" );
+      readingsEndUpdate( $hash, 1 );
+      InternalTimer( gettimeofday() + AttrVal($name, 'interval', 900)*4, "FireTV_UpdateState", $hash, 0 );
+    }
+
+    return undef;
+}
+
+
 sub FireTV_Get($@) {
 	my ($hash, @param) = @_;
-	
+
 	return '"get FireTV" needs at least one argument' if (int(@param) < 2);
-	
+
 	my $name = shift @param;
 	my $opt = shift @param;
 	my $value = join(" ", @param);
-	
+
 	if(! FireTV_connect($hash)) {
         return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
     }
-	
+
 	my $screen_state;
 	if($opt) {
 	    # update screen_state reading
 	    $screen_state = FireTV_screen_state($hash);
+            my $currentapp = FireTV_currentFocus($hash);
+            readingsBeginUpdate( $hash );
+            readingsBulkUpdate( $hash, "screenState", $screen_state ) if($screen_state);
+            readingsBulkUpdate( $hash, "currentApp", $currentapp ) if($currentapp);
+            readingsBulkUpdate( $hash, "state", "connected");
+            readingsEndUpdate( $hash, 1 );
 	}
-	
+
 	if($opt eq 'packages') {
 	    if(FireTV_adb($hash, 'shell pm list packages -f -3')) {
 	        my @response = split(/[\n\r]+/, $hash->{helper}{$name}{'lastadbresponse'});
@@ -224,7 +262,7 @@ sub FireTV_Get($@) {
 	            my ($package, $apk) = split('=', $line);
 	            push @apk, $apk;
 	        }
-	        if(@apk > 0) {
+	        if(defined($apk[0]) && @apk > 0) {
 	            @apk = sort(@apk);
 	            $hash->{helper}{$name}{'packages'} = join(',', @apk);
 	            return "Found the following installed packages: \n\n".join("\n", @apk);
@@ -236,7 +274,7 @@ sub FireTV_Get($@) {
 	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
 	    }
 
-	} elsif($opt eq 'isapprunning') {
+	  } elsif($opt eq 'isapprunning') {
         return FireTV_is_app_running($hash, $value);
 
     } elsif($opt eq 'adb') {
@@ -246,7 +284,7 @@ sub FireTV_Get($@) {
 	    } else {
 	        return "error: ".$hash->{helper}{$name}{'lastadbresponse'};
 	    }
-	    
+
     } elsif($opt eq 'getprop') {
 	    if(FireTV_adb($hash, 'shell getprop')) {
 	        my @response = split(/[\n\r]+/, $hash->{helper}{$name}{'lastadbresponse'});
@@ -272,26 +310,27 @@ sub FireTV_Get($@) {
 	    }
 
 	} else {
-	    return "Unknown argument $opt, choose one of packages:noArg isapprunning:".$hash->{helper}{$name}{'packages'}." adb getprop:noArg screen_state:noArg currentapp:noArg";
+      my $packages = $hash->{helper}{$name}{'packages'} || '';
+	    return "Unknown argument $opt, choose one of packages:noArg isapprunning:".$packages." adb getprop:noArg screen_state:noArg currentapp:noArg";
 	}
 	return undef;
 }
 
 sub FireTV_Set($@) {
 	my ($hash, @param) = @_;
-	
+
 	return '"set FireTV" needs at least one argument' if (int(@param) < 2);
-	
+
 	my $name = shift @param;
 	my $opt = shift @param;
 	my $value = join(" ", @param);
 	my $response = undef;
-	
+
 	if($opt =~ /^(appstart|appstop|apptoggle|button|screen|window|search|text|upload|uploadandview|view|deletefile|install|adb|screenshot)$/) {
 	    # $opt that need an adb-connection
 	    if(FireTV_connect($hash)) {
 	        # update screen_state reading
-	        FireTV_screen_state($hash);
+	        FireTV_UpdateState($hash); #FireTV_screen_state($hash);
 
 	        if($opt eq 'appstart') {
 	            $response = FireTV_app($hash, $value, 'start');
@@ -303,7 +342,7 @@ sub FireTV_Set($@) {
 	            } else {
 	                $response = FireTV_app($hash, $value, 'start');
 	            }
-            
+
             } elsif($opt eq 'button') {
 	            if($value eq 'up') {
 	                $response = FireTV_up($hash);
@@ -322,12 +361,12 @@ sub FireTV_Set($@) {
 	            } elsif($value eq 'menu') {
 	                $response = FireTV_menu($hash);
 	            } elsif($value eq 'prev') {
-	                $response = FireTV_playpause($hash);
+	                $response = FireTV_prev($hash);
 	            } elsif($value eq 'playpause') {
-	                $response = FireTV_enter($hash);
+	                $response = FireTV_playpause($hash);
 	            } elsif($value eq 'next') {
 	                $response = FireTV_next($hash);
-	            }	        
+	            }
 
 	        } elsif($opt eq 'screen') {
 	            if($value eq 'wakeup') {
@@ -337,7 +376,7 @@ sub FireTV_Set($@) {
 	            } elsif($value eq 'sleep') {
 	                $response = FireTV_sleep($hash);
 	            }
-            
+
             } elsif($opt eq 'screenshot') {
 	            # check if an internal timer is already running
 	            my $pid=0;
@@ -355,7 +394,7 @@ sub FireTV_Set($@) {
 	            } else {
 	                return "screenshot already running ($pid)";
 	            }
-	    
+
             } elsif($opt eq 'window') {
                 if($value eq 'settings') {
 	                $response = FireTV_settings($hash);
@@ -366,15 +405,15 @@ sub FireTV_Set($@) {
                 } elsif($value eq 'music') {
 	                $response = FireTV_app($hash, 'com.amazon.bueller.music', 'start');
                 }
-        
+
             } elsif($opt eq 'search') {
 	            $response = FireTV_search($hash, $value);
             } elsif($opt eq 'searchonly') {
 	            $response = FireTV_search_only($hash, $value);
             } elsif($opt eq 'text') {
 	            $response = FireTV_text($hash, $value);
-	        
-	        
+
+
 	        } elsif($opt eq 'upload') {
 	            my ($remotefile,$contenttype) = split(":", FireTV_uploadfile($hash, $value));
 	            if($remotefile) {
@@ -418,8 +457,8 @@ sub FireTV_Set($@) {
 	                if(FireTV_wakeup($hash)) {
 	                    $response = FireTV_view($hash, $remotefile, $contenttype);
 	                }
-	                
-	                # internal timer to delete the uploaded file                
+
+	                # internal timer to delete the uploaded file
                     if(defined($attr{$name}{upviewdeleteafter}) && $attr{$name}{upviewdeleteafter} >= 0) {
                         my $pid=0;
 	                    if(exists($hash->{helper}{$name}{'blockingcall'}{'deletefile_'.$remotefile}{RUNNING_PID})) {
@@ -441,15 +480,15 @@ sub FireTV_Set($@) {
 	            } else {
 	                return "error while uploading localfile $value";
 	            }
-	        
+
 	        } elsif($opt eq 'deletefile') {
                 return FireTV_deletefile($hash, $value);
-            
+
             } elsif($opt eq 'install') {
 	            # implemented as blocking call
 	            # there should be no need to implement this nonblocking, since apk installation is usually something you oversee
 	            $response = FireTV_adb($hash, "install -r $value");
-            
+
             } elsif($opt eq 'adb') {
 	            $response = FireTV_adb($hash, $value);
             }
@@ -461,7 +500,7 @@ sub FireTV_Set($@) {
 	        $response = FireTV_connect($hash);
         } elsif($opt eq 'disconnect') {
 	        $response = FireTV_connect($hash, 'disconnect');
-	    
+
 	    # PRESENCE
 	    } elsif($opt eq 'statusRequest' && $hash->{helper}{$name}{'PRESENCE_loaded'}) {
             if($hash->{MODE} ne "lan-bluetooth") {
@@ -471,25 +510,25 @@ sub FireTV_Set($@) {
                 if(exists($hash->{FD})) {
                     DevIo_SimpleWrite($hash, "now\n", 2);
                 } else {
-                    return "FireTV_Attr Definition '$name' is not connected to ".$hash->{DeviceName}; 
+                    return "FireTV_Attr Definition '$name' is not connected to ".$hash->{DeviceName};
                 }
-            } 
-        }
-        
+            }
+	      }
+
 	} else {
 		my $packages = $hash->{helper}{$name}{'packages'} || '';
-	    
+
 	    my @buttons = sort(qw(up down left right enter back home menu prev playpause next));
-	    my @keys = sort(qw(KEYCODE_DPAD_UP KEYCODE_DPAD_DOWN KEYCODE_DPAD_LEFT KEYCODE_DPAD_CENTER 
-	        KEYCODE_DPAD_RIGHT KEYCODE_BACK KEYCODE_HOME KEYCODE_MENU KEYCODE_MEDIA_PREVIOUS 
+	    my @keys = sort(qw(KEYCODE_DPAD_UP KEYCODE_DPAD_DOWN KEYCODE_DPAD_LEFT KEYCODE_DPAD_CENTER
+	        KEYCODE_DPAD_RIGHT KEYCODE_BACK KEYCODE_HOME KEYCODE_MENU KEYCODE_MEDIA_PREVIOUS
 	        KEYCODE_MEDIA_PLAY_PAUSE KEYCODE_MEDIA_FAST_FORWARD KEYCODE_WAKEUP KEYCODE_POWER));
         my @windows = sort(qw(appsettings settings fotos music));
-	    
+
 	    my @presence;
 	    if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
 	        push @presence, 'statusRequest:noArg';
 	    }
-	    
+
 		return "Unknown argument $opt choose one of "
 		    ."appstart:".$packages." appstop:".$packages." apptoggle:".$packages." "
             ."connect:noArg disconnect:noArg screen:sleep,toggle,wakeup screenshot:noArg "
@@ -508,9 +547,9 @@ sub FireTV_Set($@) {
 
 sub FireTV_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
-	
+
     my $hash = $defs{$name};
-	
+
 	if($cmd eq "set") {
 	    my $err;
 
@@ -518,12 +557,12 @@ sub FireTV_Attr(@) {
             if($attr_value !~ /^yes|no$/) {
 			    $err = "Invalid argument $attr_value to $attr_name. Must be yes or no.";
 	        }
-		
+
 		} elsif($attr_name =~ /^upviewdeleteafter|uploaddeleteafter$/) {
             if($attr_value !~ /^\d*$/) {
 			    $err = "Invalid argument $attr_value to $attr_name. Must be a valid integer number.";
 	        }
-		
+
 		} elsif($attr_name eq "screenshotpath") {
 		    my $basename = $attr_value;
 		    if(-d $basename ) {
@@ -531,12 +570,12 @@ sub FireTV_Attr(@) {
 		            $basename .= '/';
 		        }
 		    } else {
-		        $basename =~ s|(.*/).*|$1|; 
+		        $basename =~ s|(.*/).*|$1|;
 		    }
 		    if(! -w $basename) {
 		        $err = "$basename is not writeable";
 		    }
-		
+
 		} elsif($attr_name =~ "/^(absenceThreshold|presenceThreshold|ping_count)$/") {
             if($attr_value !~ /^\d+$/) {
                 $err = "$attr_name must be a valid integer number";
@@ -544,7 +583,7 @@ sub FireTV_Attr(@) {
             if($hash->{MODE} eq "event") {
                 $err = "$attr_name is not applicable for mode 'event'";
             }
-		
+
 		} elsif($attr_name =~ "/^(absenceTimeout|presenceTimeout)$/") {
             if($attr_value !~ /^\d?\d(?::\d\d){0,2}$/) {
                 $err = "$attr_value is not a valid time frame value. See commandref on PRESENCE for the correct syntax" ;
@@ -552,45 +591,43 @@ sub FireTV_Attr(@) {
             if($hash->{MODE} ne "event") {
                 $err = "$attr_name is only applicable for mode 'event'";
             }
-		
+
 		} elsif($attr_name eq "disable") {
 		    if($attr_value) {
-		        $hash->{STATE} = 'disabled';
+		        readingsSingleUpdate($hash, "state", "disabled", 1);
 		        RemoveInternalTimer($hash);
 		    } else {
-		        $hash->{STATE} = 'defined';
+		        #readingsSingleUpdate($hash, "state", "defined", 1);
 		        FireTV_ReadDeviceInfo($hash);
 		        PRESENCE_StartLocalScan($hash, 1);
 		    }
-		    readingsSingleUpdate($hash, "state", $hash->{STATE}, 1);
 		}
 
         if($err) {
             Log3 $name, 3, "[$name] FireTV_Attr ERROR: $err";
 			return $err;
 		}
-    
+
     } elsif($cmd eq "del") {
         if($attr_name eq "disable") {
-            $hash->{STATE} = 'defined';
-		    FireTV_ReadDeviceInfo($hash);
-		    PRESENCE_StartLocalScan($hash, 1);
-		    readingsSingleUpdate($hash, "state", $hash->{STATE}, 1);
-		}
+          #readingsSingleUpdate($hash, "state", "defined", 1);
+          FireTV_ReadDeviceInfo($hash);
+          PRESENCE_StartLocalScan($hash, 1);
+        }
     }
-	return undef;
+    return undef;
 }
 
 sub FireTV_Notify($$) {
     my ($hash,$dev) = @_;
     my $name = $hash->{NAME};
     my $dev_name = $dev->{NAME};
-    
+
     return undef if(!defined($hash) or !defined($dev));
     return undef if(!defined($dev_name) or !defined($name));
-    
+
     my $events = deviceEvents($dev,0);
-    
+
     if($hash->{helper}{$name}{'PRESENCE_loaded'}) {
         # reread packages on state change from absent to present
         if($dev_name eq $name) {
@@ -614,23 +651,23 @@ sub FireTV_Notify($$) {
 sub FireTV_adb($$) {
     my $hash = shift;
     my $cmd = shift;
-    
+
     if(ref $hash ne 'HASH' ) {
         $hash = $defs{$hash};
     }
     my $name = $hash->{NAME};
     my $ip = $hash->{IP};
-    
+
     # connect if not connected
-    # don't rely on that! 
-    # always call FireTV_connect before issuing commands, to make sure that 
+    # don't rely on that!
+    # always call FireTV_connect before issuing commands, to make sure that
     # an old/broken connection is reset first
     if($cmd !~ /^(?:dis)?connect/) {
         if(!$hash->{adbconnected}) {
             FireTV_connect($hash);
         }
     }
-    
+
     if($hash->{adbconnected} || $cmd =~ /^connect/ ) {
         my $deviceid = "-s ".$hash->{IP}.":".$hash->{PORT};
         if($cmd =~ /^connect/) {
@@ -641,7 +678,7 @@ sub FireTV_adb($$) {
 
         # execute command
         $hash->{helper}{$name}{lastadbresponse} = `$hash->{helper}{$name}{lastadbcmd} 2>&1` || '';
-        
+
         # check if adb server needs a restart
         if($hash->{helper}{$name}{lastadbresponse} =~ /cannot bind '.*?:5037'/) {
             Log3 $name, 4, "[$name] FireTV_adb response: ".$hash->{helper}{$name}{lastadbresponse};
@@ -651,7 +688,7 @@ sub FireTV_adb($$) {
             system($hash->{ADB}." connect ".$hash->{IP}.":".$hash->{PORT});
             $hash->{helper}{$name}{lastadbresponse} = `$hash->{helper}{$name}{lastadbcmd} 2>&1` || '';
         }
-        
+
         $hash->{helper}{$name}{lastadbresponse} =~ s/^\s*//sg;
         $hash->{helper}{$name}{lastadbresponse} =~ s/\s*$//sg;
 
@@ -683,7 +720,12 @@ sub FireTV_connect($;$) {
             Log3 $name, 4, "[$name] FireTV_connect: no disconnect because of holdconnection yes";
         }
     }
-    
+
+    if($action eq 'disconnect'){
+      RemoveInternalTimer($hash);
+      return undef if($hash->{adbconnected} == 0);
+    }
+
     # connect/disconnect
     if(FireTV_adb($hash, "$action $ip")) {
         if($action eq 'disconnect') {
@@ -706,7 +748,7 @@ sub FireTV_connect($;$) {
 sub FireTV_key($$) {
     my $hash = shift;
     my $key = shift;
-    
+
     return FireTV_adb($hash, "shell input keyevent $key");
 }
 
@@ -715,7 +757,7 @@ sub FireTV_text($;$) {
     my $hash = shift;
     my $text = shift;
     $text =~ s/ /%s/g;
-    
+
     return FireTV_adb($hash, "shell input text $text");
 }
 
@@ -776,12 +818,12 @@ sub FireTV_sleep($) {
 sub FireTV_dumpsys($$) {
     my $hash = shift;
     my $service = shift;
-    
+
     if(ref $hash ne 'HASH' ) {
         $hash = $defs{$hash};
     }
     my $name = $hash->{NAME};
-    
+
     if(FireTV_adb($hash, "shell dumpsys $service")) {
         return $hash->{helper}{$name}{lastadbresponse};
     }
@@ -792,15 +834,15 @@ sub FireTV_dumpsys_has($$$) {
     my $hash = shift;
     my $service = shift;
     my $regex = shift;
-    
+
     my $dump = FireTV_dumpsys($hash, $service);
-    
+
     return $dump =~ $regex;
 }
 
 sub FireTV_currentFocus($) {
     my $hash = shift;
-    
+
     my $dump = FireTV_dumpsys($hash, "window windows");
     if($dump =~ /mCurrentFocus=Window\{.*?\s.*?\s(.*?)\}/) {
         return $1;
@@ -809,8 +851,9 @@ sub FireTV_currentFocus($) {
 }
 
 sub FireTV_screen_state($) {
-    my $hash = shift;
-    
+  my $hash = shift;
+  my $name = $hash->{NAME};
+
     my $screen_state;
     if(! FireTV_dumpsys_has($hash, 'power', 'Display Power: state=ON')) {
         $screen_state = 'off';
@@ -827,8 +870,8 @@ sub FireTV_screen_state($) {
     } else {
         $screen_state = 'paused'
     }
-    
-    readingsSingleUpdate($hash, "screen_state", $screen_state, 1);
+
+    #readingsSingleUpdate($hash, "screen_state", $screen_state, 1);
     return $screen_state;
 }
 
@@ -838,7 +881,7 @@ sub FireTV_screen_state($) {
 sub FireTV_search($$) {
     my $hash = shift;
     my $text = shift;
-    
+
     if($text) {
         if(FireTV_search_only($hash,$text) && FireTV_down($hash) && FireTV_enter($hash)) {
             return 1;
@@ -850,16 +893,16 @@ sub FireTV_search($$) {
 sub FireTV_search_only($$) {
     my $hash = shift;
     my $text = shift;
-    
+
     if(ref $hash ne 'HASH' ) {
         $hash = $defs{$hash};
     }
-    
+
     my $osversion = 0;
     if($hash->{OSVERSION} =~ /\((\d+)\)/ ) {
         $osversion = $1;
     }
-    
+
     if(FireTV_wakeup($hash)) {
         usleep(5000);
         FireTV_home($hash);
@@ -913,7 +956,7 @@ sub FireTV_app($$;$) {
     my $app = shift;
     my $action = shift || 'start';
     my $name = $hash->{NAME};
-    
+
     if(FireTV_wakeup($hash)) {
         if($action eq 'start') {
             my $response;
@@ -925,7 +968,7 @@ sub FireTV_app($$;$) {
                     return $app.' started';
                 }
             }
-            
+
             # try LAUNCHER intent
             Log3 $name, 4, "[$name] FireTV_app: trying LAUNCHER for $app";
             if(FireTV_adb($hash, "shell monkey -p $app -c android.intent.category.LAUNCHER 1")) {
@@ -949,9 +992,9 @@ sub FireTV_app($$;$) {
 sub FireTV_is_app_running($$) {
     my $hash = shift;
     my $app = shift;
-    
+
     my $name = $hash->{NAME};
-    
+
     if(FireTV_adb($hash, 'shell ps|grep '.$app)) {
         my $adb = $hash->{helper}{$name}{lastadbresponse};
         if($adb =~ /(.+?)\s+(\d+)\s+.*$app/) {
@@ -1028,7 +1071,7 @@ sub FireTV_screenshot($) {
         $hash = $defs{$hash};
     }
     my $name = $hash->{NAME};
-    
+
     if(FireTV_connect($hash)) {
 	    if(FireTV_wakeup($hash)) {
             my $remote_tempfile = FireTV_tempfile($hash, '/sdcard/screenshot');
@@ -1041,7 +1084,7 @@ sub FireTV_screenshot($) {
                 } else {
                     $localfile = $attr{$name}{screenshotpath};
                 }
-                
+
                 if($localfile) {
                     FireTV_adb($hash, "pull $remote_tempfile $localfile");
                     if(! -e $localfile) {
@@ -1053,7 +1096,7 @@ sub FireTV_screenshot($) {
                 if(! FireTV_adb($hash, "shell rm $remote_tempfile")) {
                     Log3 $name, 3, "[$name] FireTV_screenshot: couldn't delete remote tempfile $remote_tempfile";
                 }
-                
+
                 return "$name|$localfile";
             }
         }
@@ -1068,7 +1111,7 @@ sub FireTV_deletefile($$) {
         $hash = $defs{$hash};
     }
     my $name = $hash->{NAME};
-       
+
     # only allow to delete files that this device has uploaded
     # uploaded files are memorized in internalval uploadedfiles
     $remotefile =~ s/:.*//;
@@ -1110,7 +1153,7 @@ sub FireTV_deletefile_blocking($) {
     my $remotefile = $param[1];
     my $delay = $param[2] || 0;
     my $hash = $defs{$name};
-    
+
     if($remotefile ne '--all') {
         sleep($delay);
         return "$name|$remotefile|".FireTV_deletefile($hash, $remotefile);
@@ -1125,7 +1168,7 @@ sub FireTV_deletefile_blocking_ok($) {
     my $remotefile = $param[1];
     my $response = $param[2];
     my $hash = $defs{$name};
-    
+
     Log3 $name, 4, "[$name] FireTV_deletefile_blocking_ok: $response";
 
     # delete the file from uploadedfiles
@@ -1143,7 +1186,7 @@ sub FireTV_deletefile_blocking_error($) {
     my $remotefile = $param[1];
     my $delay = $param[2] || 0;
     my $hash = $defs{$name};
-    
+
     Log3 $name, 3, "[$name] FireTV_deletefile_blocking_error: $name";
     delete($hash->{helper}{$name}{'blockingcall'}{'deletefile_'.$remotefile}{RUNNING_PID});
 }
@@ -1153,9 +1196,9 @@ sub FireTV_screenshot_ok($) {
     my @param = split(/\|/, shift);
     my $name = $param[0];
     my $localfile = $param[1];
-    
+
     my $hash = $defs{$name};
-    
+
     if(-r $localfile && -s $localfile) {
         Log3 $name, 4, "[$name] FireTV_screenshot_ok: $localfile";
         readingsSingleUpdate($hash, "screenshot", $localfile, 1);
@@ -1171,14 +1214,14 @@ sub FireTV_screenshot_ok($) {
         }
         Log3 $name, 3, "[$name] FireTV_screenshot_ok: something went wrong when saving $localfile for $name ($details)";
     }
-    
+
     delete($hash->{helper}{$name}{'blockingcall'}{'screenshot'}{RUNNING_PID});
 }
 
 sub FireTV_screenshot_error($) {
     my $name = shift;
     my $hash = $defs{$name};
-    
+
     Log3 $name, 3, "[$name] FireTV_screenshot_error: $name";
     readingsSingleUpdate($hash, "screenshot", '', 1);
     delete($hash->{helper}{$name}{'blockingcall'}{'screenshot'}{RUNNING_PID});
@@ -1194,12 +1237,12 @@ sub FireTV_uploadfile($$;$$) {
     my $localfile = shift;
     my $remotefile = shift || FireTV_tempfile($hash);
     my $contenttype = shift;
-  
+
     if(! -r $localfile) {
         Log3 $name, 3, "[$name] FireTV_uploadfile: can't read localfile $localfile";
         return;
-    }  
-    
+    }
+
     if(FireTV_adb($hash, "push $localfile $remotefile")) {
         # logic to guess the content-type needs File::MimeInfo
         # content-type is needed for FireTV_view
@@ -1211,12 +1254,12 @@ sub FireTV_uploadfile($$;$$) {
 	            $contenttype = mimetype($localfile);
 	        }
         }
-        
+
         # memorize uploaded files in internalval uploadedfiles
 	    my @uploadedfiles = split(/,\ */, $hash->{uploadedfiles});
 	    push @uploadedfiles, "$remotefile:$contenttype";
 	    $hash->{uploadedfiles} = join ', ', @uploadedfiles;
-        
+
         return "$remotefile:$contenttype";
     } else {
         Log3 $name, 3, "[$name] FireTV_uploadfile: couldn't upload localfile $localfile to remotefile $remotefile (".$hash->{helper}{$name}{lastadbresponse}.")";
@@ -1249,7 +1292,7 @@ sub FireTV_view($$$) {
 	        Log3 $name, 3, "[$name] FireTV_view: couldn't download remotefile $remotefile to localfile $localfile (".$hash->{helper}{$name}{lastadbresponse}.")";
 	    }
     }
-    
+
     if(! $contenttype) {
         Log3 $name, 3, "[$name] FireTV_view: please specify the files content-type";
         return;
@@ -1264,7 +1307,7 @@ sub FireTV_Remote($;$$$) {
     my $remoteicon = shift || 'it_remote';
     my $collapsible = shift || 0;
     my $devicelink = shift;
-    
+
     if(ref $hash ne 'HASH' ) {
         $hash = $defs{$hash};
     }
@@ -1272,7 +1315,7 @@ sub FireTV_Remote($;$$$) {
     if($hash->{TYPE} ne 'FireTV') {
         return "$name is not of type FireTV";
     }
-    
+
     if(defined($devicelink)){
         if($devicelink eq "0") {
             $devicelink="";
@@ -1282,20 +1325,20 @@ sub FireTV_Remote($;$$$) {
     } else {
         $devicelink="Remote for <a href='$FW_ME$FW_subdir?detail=$name'>".AttrVal($name, 'alias', $name)."</a>";
     }
-    
+
     my $btncmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name button ";
-    
+
     my $remotehtml = AttrVal($name, 'remotehtml', undef);
     if($remotehtml && $remotehtml =~ m/^\s*{.*}\s*$/) {
         $remotehtml = eval $remotehtml;
     }
-    
+
     # example for remotehtml
     # replace FIRETV (sub name and $name) with your devices name
     # {
     #     my $name = 'FIRETV';
     #     my $cmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$name=set $name ";
-    # 
+    #
     #     return "<tr><td colspan='3'><hr></td></tr>
     #             <tr>
     #                 <td><a onClick=\"$cmd appstart org.xbmc.kodi')\">".FW_makeImage("kodi", "Kodi", "rc-button")."</a></td>
@@ -1318,7 +1361,7 @@ sub FireTV_Remote($;$$$) {
     #                 <td><a onClick=\"$cmd search terminator')\">".FW_makeImage("robot2", "hasta la vista", "rc-button")."</a></td>
     #             </tr>";
     # }
-    
+
     my $icon='';
     my $style='';
     if($collapsible) {
@@ -1328,7 +1371,7 @@ sub FireTV_Remote($;$$$) {
     } else {
         $icon = FW_makeImage($remoteicon, "Remote", "rc-button");
     }
-    
+
     my $html = "<div class='firetv-remote' id='$name"."-remote'>
         $icon
         $devicelink
@@ -1383,7 +1426,7 @@ sub FireTV_SetTimer($;$) {
         } else {
             $nextTrigger = $now + ($start ? $start : $interval);
         }
-        
+
         $hash->{TRIGGERTIME}     = $nextTrigger;
         $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
         RemoveInternalTimer("update:$name");
@@ -1401,19 +1444,19 @@ sub FireTV_FetchStatus($) {
         $hash = $defs{$hash};
     }
     my $name = $hash->{NAME};
-    
-    if($hash->{STATE} eq 'absent' ) {
+
+    if(ReadingsVal( $name, "state", "-") eq 'absent' ) {
         Log3 $name, 4, "[$name] FireTV_FetchStatus: Device is absent. Skipping";
     } elsif(!IsDisabled($name) && (!defined($attr{$name}{disabled}) || $attr{$name}{disabled} ne 'yes')) {
         $hash->{BUSY}            = 1;
         $hash->{LASTSEND}        = gettimeofday();
 
         Log3 $name, 4, "[$name] FireTV_FetchStatus: starting FireTV_screen_state";
-        FireTV_screen_state($hash);
+        FireTV_UpdateState($hash); #FireTV_screen_state($hash);
         $hash->{BUSY}            = 0;
     } else {
-        $hash->{STATE}           = 'disabled';
-        Log3 $name, 4, "[$name] FireTV_FetchStatus: Device is disabled. Skipping";
+      readingsSingleUpdate($hash, "state", "disabled", 1);
+      Log3 $name, 4, "[$name] FireTV_FetchStatus: Device is disabled. Skipping";
     }
     FireTV_SetTimer($hash);
 }
@@ -1426,8 +1469,8 @@ sub FireTV_FetchStatus($) {
 <a name="FireTV"></a>
 <h3>FireTV</h3>
 <ul>
-    <i>FireTV</i> is used to remote control a Amazon FireTV device. It is not able 
-    to read the currently playing music/movie or other status information, 
+    <i>FireTV</i> is used to remote control a Amazon FireTV device. It is not able
+    to read the currently playing music/movie or other status information,
     but sending commands to the device. A working copy of <i>adb</i> is needed.
     <br><br>
     <b>Prerequisites</b>
@@ -1455,7 +1498,7 @@ sub FireTV_FetchStatus($) {
         Example: <code>define FIRETV FireTV 192.168.178.66 /usr/local/bin/adb</code>
         <br><br>
         <b>HOST</b> is the ip-address or hostname of your FireTV-device<br>
-        <b>PORT</b> is the port where adb listens on the FireTV-device. It shouldn't be necessary to ever set this parameter. Default: 5555<br> 
+        <b>PORT</b> is the port where adb listens on the FireTV-device. It shouldn't be necessary to ever set this parameter. Default: 5555<br>
         <b>sudo</b> the keyword sudo ensures that adb is called using sudo. You need to add an entry for your fhem-user to call adb without password in /etc/sudoers
         <b>ADB_PATH</b> is the full path to your adb-binary. Default: /usr/bin/adb<br>
         <b>PRESENCE_TIMEOUT_ABSENT</b> timeout (in seconds) to the next presence check if the device is absent. Default: 30<br>
@@ -1464,7 +1507,7 @@ sub FireTV_FetchStatus($) {
         <b>PRESENCE_ADRESS</b> address for the presence check, see <a href="#PRESENCE">PRESENCE</a>. Default: &lt;IP&gt;<br>
     </ul>
     <br>
-    
+
     <a name="FireTVget"></a>
     <b>Get</b><br>
     <ul>
@@ -1483,7 +1526,7 @@ sub FireTV_FetchStatus($) {
                 Returns the current screen status. May be one off: off, idle, daydream, standby, playing, paused</li>
         </ul>
     </ul>
-    
+
     <a name="FireTVset"></a>
     <b>Set</b><br>
     <ul>
@@ -1507,23 +1550,23 @@ sub FireTV_FetchStatus($) {
             <li><i>disconnect</i><br>
                 Disconnect adb from your firetv</li>
             <li><i>install &lt;APK&gt;</i><br>
-                Install ("sideload") an apk-file on your firetv. APK is a local path on your 
-                fhem-server. <i>install</i> is implemented as a blocking call, don't use it 
+                Install ("sideload") an apk-file on your firetv. APK is a local path on your
+                fhem-server. <i>install</i> is implemented as a blocking call, don't use it
                 in scripts</li>
             <li><i>key &lt;KEYCODE&gt;</i><br>
-                Send a standard android keycode to your firetv. You can send <a href="https://developer.android.com/reference/android/view/KeyEvent.html">any keycode</a>, 
-                but firetv may not understand them all (known to work: KEYCODE_DPAD_UP, 
-                KEYCODE_DPAD_DOWN, KEYCODE_DPAD_LEFT, KEYCODE_DPAD_CENTER, KEYCODE_DPAD_RIGHT, 
-                KEYCODE_BACK, KEYCODE_HOME, KEYCODE_MENU, KEYCODE_MEDIA_PREVIOUS, 
+                Send a standard android keycode to your firetv. You can send <a href="https://developer.android.com/reference/android/view/KeyEvent.html">any keycode</a>,
+                but firetv may not understand them all (known to work: KEYCODE_DPAD_UP,
+                KEYCODE_DPAD_DOWN, KEYCODE_DPAD_LEFT, KEYCODE_DPAD_CENTER, KEYCODE_DPAD_RIGHT,
+                KEYCODE_BACK, KEYCODE_HOME, KEYCODE_MENU, KEYCODE_MEDIA_PREVIOUS,
                 KEYCODE_MEDIA_PLAY_PAUSE, KEYCODE_MEDIA_FAST_FORWARD, KEYCODE_WAKEUP, KEYCODE_POWER)</li>
             <li><i>screen &lt;wakeup|toggle|sleep&gt;</i><br>
                 Set screen to wake up or sleep or toggle between these states</li>
             <li><i>screenshot</i><br>
-                Take a screenshot and download it to a local tempfile on your fhem-server. 
+                Take a screenshot and download it to a local tempfile on your fhem-server.
                 Since it may take some seconds to produce a screenshot, this function is
-                implemented nonblocking (iow: no direct feedback). The path to the local 
-                tempfile is saved in a reading "screenshot" and may be set by the attribute 
-                "screenshotpath". Screenshots taken while playing a movie/tv-show/etc from 
+                implemented nonblocking (iow: no direct feedback). The path to the local
+                tempfile is saved in a reading "screenshot" and may be set by the attribute
+                "screenshotpath". Screenshots taken while playing a movie/tv-show/etc from
                 amazons library are in general just black. On error the reading "screenshot"
                 is emptied</li>
             <li><i>search &lt;TEXT&gt;</i><br>
@@ -1535,20 +1578,20 @@ sub FireTV_FetchStatus($) {
             <li><i>text &lt;TEXT&gt;</i><br>
                 Send text to your firetv</li>
             <li><i>uploadandview &lt;PATH:CONTENTTYPE&gt;</i><br>
-                Upload a file to your firetv and view it on screen. The view action is 
+                Upload a file to your firetv and view it on screen. The view action is
                 dependend on an arbitrary installed app that handles CONTENTTYPE and is
-                not limited to images. 
-                You may omit CONTENTTYPE if you have the perl module File::MimeInfo 
+                not limited to images.
+                You may omit CONTENTTYPE if you have the perl module File::MimeInfo
                 installed on your system. Such files may be automatically deleted when
                 the attribute <i>upviewdeleteafter</i> is set (see below)</li>
             <li><i>upload &lt;PATH&gt;</i><br>
-                Upload a file to your firetv. Such files may be automatically deleted 
+                Upload a file to your firetv. Such files may be automatically deleted
                 when the attribute <i>uploaddeleteafter</i> is set (see below)</li>
             <li><i>view &lt;PATH:CONTENTTYPE&gt;</i><br>
-                View a file on your firetv. The view action is dependend on an arbitrary 
+                View a file on your firetv. The view action is dependend on an arbitrary
                 installed app that handles CONTENTTYPE  and is
-                not limited to images. If you have the perl module File::MimeInfo installed 
-                on your system, you may replace CONTENTTYPE whith the keyword <i>load</i>: 
+                not limited to images. If you have the perl module File::MimeInfo installed
+                on your system, you may replace CONTENTTYPE whith the keyword <i>load</i>:
                 The file will be downloaded to your fhem-server prior viewing it on screen, then
                 (which may take some time and is generally speaking inefficient).</li>
             <li><i>window &lt;appsetting|fotos|music|settings&gt;</i><br>
@@ -1568,8 +1611,8 @@ sub FireTV_FetchStatus($) {
             <li><i>remotehtml</i> &lt;HTML&gt;<br>
                 HTML to add to the output of FireTV_Remote() (<a href="#FireTV_FireTV_Remote">see below</a>)</li>
             <li><i>screenshotpath</i> &lt;PATH&gt;<br>
-                If <i>screenshotpath</i> is set to a filename, every new screenshot (see <i>set screenshot</i>) will overwrite that file. 
-                If set to a directory, a random file will be created in that directory. 
+                If <i>screenshotpath</i> is set to a filename, every new screenshot (see <i>set screenshot</i>) will overwrite that file.
+                If set to a directory, a random file will be created in that directory.
                 If not set, a random file is created in your systems tempdirectory. Default: not set</li>
             <li><i>uploaddeleteafter</i> &lt;SECONDS&gt;<br>
                 Files uploaded via <i>set upload</i> are deleted after SECONDS when set to a positve integer number. Default: not set</li>
@@ -1592,7 +1635,7 @@ sub FireTV_FetchStatus($) {
         </ul>
     </ul>
     <br>
-    
+
     <a name="FireTVSTATE"></a>
     <b>Values of STATE</b>
     <ul>
@@ -1615,7 +1658,7 @@ sub FireTV_FetchStatus($) {
     <b>FireTV_Remote()</b>
     <ul>
         The module provides an additional function <i>FireTV_Remote()</i> which returns
-        html code for a graphic remote control usable in FHEMWEB. Just define a weblink 
+        html code for a graphic remote control usable in FHEMWEB. Just define a weblink
         device like:
         <br><br>
         <code>define FIRETV_REMOTE weblink htmlCode { FireTV_Remote('FIRETV') }</code><br>
@@ -1629,15 +1672,15 @@ sub FireTV_FetchStatus($) {
             <li>DEVICELINK: If not set, the Remote has a clickable title which links to the controlled device. If set to "0" it has no title. If set to any other value, that value will be used as clickable title. Default: not set</li>
         </ul>
         <br>
-        The content of the attribute <i>remotehtml</i> is added at the end of FireTV_Remote() 
-        output. If the content is wrapped in curly brackets it is interpreted as perl-code. 
+        The content of the attribute <i>remotehtml</i> is added at the end of FireTV_Remote()
+        output. If the content is wrapped in curly brackets it is interpreted as perl-code.
         The output is structured in a three-column table-layout. Here is an example of how to
         add some additional buttons to the remote:
         <br>
         <pre>    {
         my $device = 'FIRETV';
         my $cmd = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd.$device=set $device ";
-    
+
         return "&lt;tr&gt;&lt;td colspan='3'&gt;&lt;hr&gt;&lt;/td&gt;&lt;/tr&gt;
                 &lt;tr&gt;
                     &lt;td&gt;&lt;a onClick=\"$cmd appstart org.xbmc.kodi')\"&gt;".FW_makeImage("kodi", "Kodi", "rc-button")."&lt;/a&gt;&lt;/td&gt;
